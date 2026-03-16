@@ -79,6 +79,20 @@ models/**/logs/
 models/**/runs/
 models/**/.gradio/
 
+# Large demo / showcase assets
+/models/Matrix-Game/Matrix-Game-2/assets/pdf/
+/models/Matrix-Game/Matrix-Game-2/demo_images/
+/models/Matrix-Game/Matrix-Game-1/assets/videos/
+/models/Vid2World/assets/long_rollout/
+/models/Vid2World/assets/v2w_overview.png
+/models/Hunyuan-GameCraft-1.0/asset/teaser.png
+/models/lingbot-world/LingBot_World_paper.pdf
+/models/worldfm/submodules/HunyuanWorld-1.0/assets/panorama1.gif
+/models/worldfm/submodules/HunyuanWorld-1.0/assets/panorama2.gif
+/models/worldfm/submodules/HunyuanWorld-1.0/assets/quick_look.gif
+/models/worldfm/submodules/HunyuanWorld-1.0/assets/roaming_world.gif
+/models/worldfm/submodules/HunyuanWorld-1.0/assets/application.png
+
 # Known model-local datasets / caches that are not source code
 /models/solaris/datasets/
 /models/Matrix-Game/Matrix-Game-1/GameWorldScore/GameWorld/third_party/amt/datasets/
