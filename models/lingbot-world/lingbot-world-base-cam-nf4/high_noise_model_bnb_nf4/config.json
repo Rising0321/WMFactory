@@ -1,0 +1,15 @@
+{
+  "_class_name": "WanModel",
+  "_diffusers_version": "0.36.0",
+  "_name_or_path": "lingbot-world-base-cam",
+  "model_type": "i2v",
+  "text_len": 512,
+  "in_dim": 36,
+  "dim": 5120,
+  "ffn_dim": 13824,
+  "freq_dim": 256,
+  "out_dim": 16,
+  "num_heads": 40,
+  "num_layers": 40,
+  "eps": 1e-06
+}

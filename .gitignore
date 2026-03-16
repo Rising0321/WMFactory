@@ -10,12 +10,6 @@
 
 # Third-party model repos to keep local only
 /models/WonderWorld/
-/models/diamond/
-/models/solaris/
-/models/Matrix-Game/
-/models/YUME/
-/models/lingbot-world/
-/models/wham/
 
 # Python cache/build artifacts
 __pycache__/

@@ -1,0 +1,18 @@
+type = "Wham"
+entrypoint = "wham.dweam_game:WhamGame"
+repo_link = "https://huggingface.co/microsoft/wham"
+thumbnail_dir = "thumbnails"
+
+# Game-specific metadata
+[games.wham]
+title = "Wham"
+tags = ["MOBA"]
+description = "Microsoft's WHAM model, for game ideation."
+
+[games.wham.buttons]
+"⬆️ Up" = "Arrow Up"
+"⬅️ Left" = "Arrow Left"
+"⬇️ Down" = "Arrow Down"
+"➡️ Right" = "Arrow Right"
+"🔨 Interact" = "Z"
+"🔄 Reset" = "Enter"

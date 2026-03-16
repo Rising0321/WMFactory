@@ -1,0 +1,15 @@
+torch>=2.0.0
+torchvision
+torchaudio
+bitsandbytes>=0.43.0
+safetensors
+accelerate
+transformers
+diffusers
+einops
+imageio
+imageio-ffmpeg
+pillow
+numpy
+tqdm
+easydict
