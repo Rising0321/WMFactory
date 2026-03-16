@@ -51,6 +51,7 @@ Thumbs.db
 *.mp4
 *.npy
 *.npz
+!assets/*.mp4
 
 # Common model/runtime artifacts that should not go to GitHub
 *.ckpt
