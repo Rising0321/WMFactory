@@ -25,26 +25,29 @@ In this project, a "World Model" means a model in the spirit of Genie-style inte
 
 That makes this repo both a product surface and an evaluation surface. In the same way that arena-style systems made LLM comparison intuitive, this project aims to make interactive world-model comparison legible to both researchers and normal users.
 
-## Demos
 
-<table>
-  <tr>
-    <td width="33%"><strong>World</strong></td>
-    <td width="33%"><strong>MatrixWorld</strong></td>
-    <td width="33%"><strong>Diamond</strong></td>
-  </tr>
-  <tr>
-    <td>
-      <video src="./assets/2_worldfm.mp4" controls muted playsinline width="100%"></video>
-    </td>
-    <td>
-      <video src="./assets/6_MatrixGame.mp4" controls muted playsinline width="100%"></video>
-    </td>
-    <td>
-      <video src="./assets/1_diamond.mp4" controls muted playsinline width="100%"></video>
-    </td>
-  </tr>
-</table>
+## Supported Models and Services
+
+The repo already contains service wrappers and adapter surfaces for the following model families:
+
+| Model | Upstream |
+| --- | --- |
+| WorldFM | [inspatio/worldfm](https://github.com/inspatio/worldfm) |
+| Solaris | [solaris-wm/solaris](https://github.com/solaris-wm/solaris) |
+| Infinite-World | [MeiGen-AI/Infinite-World](https://github.com/MeiGen-AI/Infinite-World) |
+| LingBot-World | [Robbyant/lingbot-world](https://github.com/Robbyant/lingbot-world) |
+| YUME | [stdstu12/YUME](https://github.com/stdstu12/YUME) |
+| HY-WorldPlay | [Tencent-Hunyuan/HY-WorldPlay](https://github.com/Tencent-Hunyuan/HY-WorldPlay) |
+| Hunyuan-GameCraft-1.0 | [Tencent-Hunyuan/Hunyuan-GameCraft-1.0](https://github.com/Tencent-Hunyuan/Hunyuan-GameCraft-1.0) |
+| Matrix-Game | [SkyworkAI/Matrix-Game](https://github.com/SkyworkAI/Matrix-Game) |
+| Vid2World | [thuml/Vid2World](https://github.com/thuml/Vid2World) |
+| MineWorld | [microsoft/mineworld](https://github.com/microsoft/mineworld) |
+| WHAM | [microsoft/wham](https://huggingface.co/microsoft/wham) |
+| Open-Oasis | [etched-ai/open-oasis](https://github.com/etched-ai/open-oasis) |
+| Diamond | [eloialonso/diamond](https://github.com/eloialonso/diamond) |
+
+The project is deliberately structured so new world models can be plugged in without redesigning the frontend.
+
 
 ## Why This Project Exists
 
@@ -64,47 +67,6 @@ This repo solves that by treating the frontend as a stable contract and every mo
 - Each model runs in its own environment or service.
 - Adapters translate one shared interaction schema into model-specific runtime calls.
 - The user experience stays stable even when the backends are completely different.
-
-## System Architecture
-
-```mermaid
-flowchart TD
-    U[User]
-
-    subgraph Experience Layer
-        FE[Unified Web Frontend<br/>frontend/web]
-    end
-
-    subgraph Gateway Layer
-        GW[Gateway API<br/>frontend/server.py]
-        AD[Model Adapters<br/>frontend/adapters]
-    end
-
-    subgraph Runtime Layer
-        S[Per-Model Runtime Services]
-    end
-
-    subgraph Model Layer
-        M1[Model Repositories]
-        M2[Weights / Checkpoints / Assets]
-    end
-
-    subgraph Data Layer
-        DS[Datasets / Uploaded Images]
-    end
-
-    U --> FE
-    FE --> GW
-    DS --> GW
-    GW --> AD
-    AD --> S
-    S --> M1
-    M2 --> M1
-    S --> GW
-    GW --> FE
-```
-
-
 
 ## Unified Interaction Contract
 
@@ -187,22 +149,6 @@ Then open the web app, select a model, select or upload an image, and start step
 - `W / A / S / D`: movement
 - drag mouse: camera control
 
-## Models and Services
-
-The repo already contains service wrappers and adapter surfaces for multiple models, including:
-
-- Diamond
-- Hunyuan GameCraft
-- Infinite-World
-- Vid2World
-- MineWorld
-- Open-Oasis
-- WHAM
-- WorldFM
-- WorldPlay
-- YUME
-
-The project is deliberately structured so new world models can be plugged in without redesigning the frontend.
 
 ## Research Use Case
 
@@ -214,6 +160,58 @@ This project is especially useful if you care about questions like:
 - How should we benchmark world generation beyond offline videos?
 
 This is why the frontend matters. It is not decoration. It is the evaluation instrument.
+
+
+## Demos
+
+GitHub README rendering does not reliably inline local `mp4` playback, so the demo videos are linked as preview files:
+
+| Demo | Preview |
+| --- | --- |
+| World | [Open preview](./assets/2_worldfm.mp4) |
+| MatrixWorld | [Open preview](./assets/6_MatrixGame.mp4) |
+| Diamond | [Open preview](./assets/1_diamond.mp4) |
+
+## System Architecture
+
+```mermaid
+flowchart TD
+    U[User]
+
+    subgraph Experience Layer
+        FE[Unified Web Frontend<br/>frontend/web]
+    end
+
+    subgraph Gateway Layer
+        GW[Gateway API<br/>frontend/server.py]
+        AD[Model Adapters<br/>frontend/adapters]
+    end
+
+    subgraph Runtime Layer
+        S[Per-Model Runtime Services]
+    end
+
+    subgraph Model Layer
+        M1[Model Repositories]
+        M2[Weights / Checkpoints / Assets]
+    end
+
+    subgraph Data Layer
+        DS[Datasets / Uploaded Images]
+    end
+
+    U --> FE
+    FE --> GW
+    DS --> GW
+    GW --> AD
+    AD --> S
+    S --> M1
+    M2 --> M1
+    S --> GW
+    GW --> FE
+```
+
+
 
 ## To Do List
 
