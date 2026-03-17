@@ -263,4 +263,15 @@ The goal is to increase expressiveness without losing the simplicity of the unif
 
 This project stands on top of many excellent model repos from the world-model ecosystem. The purpose here is not to replace them, but to give them a common interaction surface.
 
+Special thanks to the authors of [OpenWorldLib](https://github.com/OpenDCAI/OpenWorldLib) for their work and for the discussions that helped shape this project.
+
 If you are building interactive world models and want a unified frontend target, this repo is exactly that direction.
+
+```bibtex
+@misc{wmfactory,
+  title  = {WMFactory: World Model Unified Frontend},
+  author = {Ruixing Zhang},
+  year   = {2026},
+  url    = {https://github.com/Rising0321/WMFactory}
+}
+```
