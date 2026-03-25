@@ -263,10 +263,7 @@ button:hover {
   border-radius: 22px;
   border: 1px solid var(--line);
   background: linear-gradient(180deg, rgba(255, 249, 241, 0.96), rgba(247, 239, 227, 0.96));
-  display: grid;
-  grid-template-columns: 1.2fr auto auto;
-  align-items: center;
-  gap: 24px;
+  display: block;
 }
 
 .wasd-cluster {
@@ -317,6 +314,24 @@ button:hover {
   align-items: center;
 }
 
+.controller-card {
+  padding: 16px;
+  border-top: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(255, 251, 246, 0.98), rgba(244, 235, 222, 0.98));
+}
+
+.controller-title {
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+.controller-inline {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: center;
+}
+
 .camera-stick {
   position: relative;
   width: 160px;
@@ -362,6 +377,10 @@ button:hover {
 
   .control-deck {
     text-align: center;
+  }
+
+  .controller-inline {
+    display: block;
   }
 
   .wasd-cluster,

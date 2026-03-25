@@ -50,7 +50,7 @@
       <main class="arena panel">
         <div class="arena-head">
           <div class="arena-title">Battle View</div>
-          <div class="arena-note">同一份 action JSON 会被发送到左右两侧，并在两侧都返回后才接受下一次输入。</div>
+          <div class="arena-note">左右两侧分别发送各自 action JSON，并在两侧都返回后才接受下一次输入。</div>
         </div>
 
         <div class="split-stage">
@@ -62,6 +62,24 @@
             <div class="viewport-wrap">
               <img id="leftFrameView" alt="Left model frame" />
             </div>
+            <div class="controller-card" data-side="left">
+              <div class="controller-title">Left Controller</div>
+              <div class="controller-inline">
+                <div class="wasd-cluster" data-side="left">
+                  <button class="key key-w" data-side="left" data-key="w">W</button>
+                  <button class="key key-a" data-side="left" data-key="a">A</button>
+                  <button class="key key-s" data-side="left" data-key="s">S</button>
+                  <button class="key key-d" data-side="left" data-key="d">D</button>
+                </div>
+                <div class="camera-panel">
+                  <div class="camera-copy">视角</div>
+                  <div class="camera-stick" id="leftCameraStick" data-side="left">
+                    <div class="camera-ring"></div>
+                    <div class="camera-knob" id="leftCameraKnob"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </section>
 
           <section class="viewport-card">
@@ -71,6 +89,24 @@
             </div>
             <div class="viewport-wrap">
               <img id="rightFrameView" alt="Right model frame" />
+            </div>
+            <div class="controller-card" data-side="right">
+              <div class="controller-title">Right Controller</div>
+              <div class="controller-inline">
+                <div class="wasd-cluster" data-side="right">
+                  <button class="key key-w" data-side="right" data-key="w">W</button>
+                  <button class="key key-a" data-side="right" data-key="a">A</button>
+                  <button class="key key-s" data-side="right" data-key="s">S</button>
+                  <button class="key key-d" data-side="right" data-key="d">D</button>
+                </div>
+                <div class="camera-panel">
+                  <div class="camera-copy">视角</div>
+                  <div class="camera-stick" id="rightCameraStick" data-side="right">
+                    <div class="camera-ring"></div>
+                    <div class="camera-knob" id="rightCameraKnob"></div>
+                  </div>
+                </div>
+              </div>
             </div>
           </section>
 
@@ -85,23 +121,8 @@
 
         <div class="control-deck">
           <div class="control-copy">
-            <div class="control-title">Shared Controller</div>
-            <p>一套 WASD 与视角控制，同时作用于左右两个世界模型。</p>
-          </div>
-
-          <div class="wasd-cluster">
-            <button class="key key-w" data-key="w">W</button>
-            <button class="key key-a" data-key="a">A</button>
-            <button class="key key-s" data-key="s">S</button>
-            <button class="key key-d" data-key="d">D</button>
-          </div>
-
-          <div class="camera-panel">
-            <div class="camera-copy">视角</div>
-            <div class="camera-stick" id="cameraStick">
-              <div class="camera-ring"></div>
-              <div class="camera-knob" id="cameraKnob"></div>
-            </div>
+            <div class="control-title">Dual Controllers</div>
+            <p>左右两套控制器分别映射到对应模型，避免不同动作尺度导致画面逐步漂移。</p>
           </div>
         </div>
       </main>

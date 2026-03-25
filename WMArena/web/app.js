@@ -21,6 +21,29 @@ const SHARED_CONTROL_PROFILES = {
   default: { invertX: INVERT_CAMERA_X, invertY: INVERT_CAMERA_Y },
 };
 
+function createControls() {
+  return {
+    w: false,
+    a: false,
+    s: false,
+    d: false,
+    camera_dx: 0,
+    camera_dy: 0,
+    l_click: false,
+    r_click: false,
+  };
+}
+
+function createSideRuntime() {
+  return {
+    controls: createControls(),
+    mineworldCameraActive: false,
+    mineworldCameraPointerId: null,
+    mineworldCameraLastX: 0,
+    mineworldCameraLastY: 0,
+  };
+}
+
 const state = {
   models: [],
   leftModelId: null,
@@ -30,20 +53,10 @@ const state = {
   seedImage: null,
   stepping: false,
   sessionActive: false,
-  controls: {
-    w: false,
-    a: false,
-    s: false,
-    d: false,
-    camera_dx: 0,
-    camera_dy: 0,
-    l_click: false,
-    r_click: false,
+  sides: {
+    left: createSideRuntime(),
+    right: createSideRuntime(),
   },
-  mineworldCameraActive: false,
-  mineworldCameraPointerId: null,
-  mineworldCameraLastX: 0,
-  mineworldCameraLastY: 0,
 };
 
 const el = {
@@ -65,8 +78,10 @@ const el = {
   rightMeta: document.getElementById("rightMeta"),
   startOverlay: document.getElementById("startOverlay"),
   startFloatingBtn: document.getElementById("startFloatingBtn"),
-  cameraStick: document.getElementById("cameraStick"),
-  cameraKnob: document.getElementById("cameraKnob"),
+  leftCameraStick: document.getElementById("leftCameraStick"),
+  rightCameraStick: document.getElementById("rightCameraStick"),
+  leftCameraKnob: document.getElementById("leftCameraKnob"),
+  rightCameraKnob: document.getElementById("rightCameraKnob"),
 };
 
 async function api(path, options = {}) {
@@ -142,14 +157,22 @@ function syncDistinctSelects(changedSide) {
   }
 }
 
+function resetSideRuntime(side) {
+  state.sides[side] = createSideRuntime();
+}
+
 function invalidateLoadedArena(reasonText) {
   state.leftLoaded = false;
   state.rightLoaded = false;
   state.sessionActive = false;
+  resetSideRuntime("left");
+  resetSideRuntime("right");
   el.leftModelStatus.textContent = "未加载";
   el.rightModelStatus.textContent = "未加载";
   el.leftMeta.textContent = "等待加载";
   el.rightMeta.textContent = "等待加载";
+  updateAllControllerStyles();
+  centerAllKnobs();
   updateOverlay();
   if (reasonText) {
     setBattleStatus(reasonText);
@@ -245,7 +268,7 @@ async function onStartBattle() {
     el.leftFrameView.src = `data:image/png;base64,${data.left.frame_base64}`;
     el.rightFrameView.src = `data:image/png;base64,${data.right.frame_base64}`;
     updateOverlay();
-    setBattleStatus("对战已开始。现在所有控制输入都会同步广播到两侧。");
+    setBattleStatus("对战已开始。现在左右两侧使用各自独立控制器。");
   } catch (err) {
     setBattleStatus(`启动失败: ${err.message}`, true);
   }
@@ -287,8 +310,54 @@ function chunkedModelLabel(modelId) {
   return labels[modelId] || "Chunked Model";
 }
 
-function controlModelId() {
-  return state.leftModelId;
+function modelIdForSide(side) {
+  return side === "left" ? state.leftModelId : state.rightModelId;
+}
+
+function controlsForSide(side) {
+  return state.sides[side].controls;
+}
+
+function neutralAction() {
+  return {
+    w: false,
+    a: false,
+    s: false,
+    d: false,
+    camera_dx: 0,
+    camera_dy: 0,
+    l_click: false,
+    r_click: false,
+  };
+}
+
+function effectiveActionForSide(side) {
+  const modelId = modelIdForSide(side);
+  const controls = { ...controlsForSide(side) };
+  const cameraDeadzone = modelId === "mineworld" ? MINEWORLD_CAMERA_DEADZONE : CAMERA_DEADZONE;
+  if (Math.abs(controls.camera_dx) <= cameraDeadzone) {
+    controls.camera_dx = 0;
+  }
+  if (Math.abs(controls.camera_dy) <= cameraDeadzone) {
+    controls.camera_dy = 0;
+  }
+  return controls;
+}
+
+function hasInputForSide(side) {
+  const modelId = modelIdForSide(side);
+  const cameraDeadzone = modelId === "mineworld" ? MINEWORLD_CAMERA_DEADZONE : CAMERA_DEADZONE;
+  const controls = controlsForSide(side);
+  return (
+    !!controls.w ||
+    !!controls.a ||
+    !!controls.s ||
+    !!controls.d ||
+    !!controls.l_click ||
+    !!controls.r_click ||
+    Math.abs(controls.camera_dx) > cameraDeadzone ||
+    Math.abs(controls.camera_dy) > cameraDeadzone
+  );
 }
 
 async function stepLoop() {
@@ -296,39 +365,31 @@ async function stepLoop() {
     return;
   }
 
-  const modelId = controlModelId();
-  const cameraDeadzone = modelId === "mineworld" ? MINEWORLD_CAMERA_DEADZONE : CAMERA_DEADZONE;
-  if (Math.abs(state.controls.camera_dx) <= cameraDeadzone) {
-    state.controls.camera_dx = 0;
-  }
-  if (Math.abs(state.controls.camera_dy) <= cameraDeadzone) {
-    state.controls.camera_dy = 0;
-  }
-
-  const hasInput =
-    !!state.controls.w ||
-    !!state.controls.a ||
-    !!state.controls.s ||
-    !!state.controls.d ||
-    !!state.controls.l_click ||
-    !!state.controls.r_click ||
-    Math.abs(state.controls.camera_dx) > cameraDeadzone ||
-    Math.abs(state.controls.camera_dy) > cameraDeadzone;
-
-  if (!hasInput) {
+  const leftHasInput = hasInputForSide("left");
+  const rightHasInput = hasInputForSide("right");
+  if (!leftHasInput && !rightHasInput) {
     return;
   }
 
+  const leftAction = leftHasInput ? effectiveActionForSide("left") : neutralAction();
+  const rightAction = rightHasInput ? effectiveActionForSide("right") : neutralAction();
   state.stepping = true;
-  const action = { ...state.controls };
+
   try {
-    if (isChunkedModel(modelId)) {
-      setBattleStatus(`${chunkedModelLabel(modelId)} 控制映射已应用，正在等待左右两侧都完成当前生成...`);
+    if (leftHasInput && isChunkedModel(state.leftModelId)) {
+      setBattleStatus(`${chunkedModelLabel(state.leftModelId)} 左侧正在生成下一段...`);
+    } else if (rightHasInput && isChunkedModel(state.rightModelId)) {
+      setBattleStatus(`${chunkedModelLabel(state.rightModelId)} 右侧正在生成下一段...`);
     }
+
     const data = await api("/api/arena/step", {
       method: "POST",
-      body: JSON.stringify({ action }),
+      body: JSON.stringify({
+        left_action: leftAction,
+        right_action: rightAction,
+      }),
     });
+
     el.leftFrameView.src = `data:image/png;base64,${data.left.frame_base64}`;
     el.rightFrameView.src = `data:image/png;base64,${data.right.frame_base64}`;
 
@@ -337,7 +398,7 @@ async function stepLoop() {
     if (leftLatency > 0 || rightLatency > 0 || isLatencyModel(state.leftModelId) || isLatencyModel(state.rightModelId)) {
       const leftSeconds = leftLatency > 0 ? `${(leftLatency / 1000).toFixed(1)}s` : "-";
       const rightSeconds = rightLatency > 0 ? `${(rightLatency / 1000).toFixed(1)}s` : "-";
-      setBattleStatus(`同步 step 完成。左侧耗时 ${leftSeconds}，右侧耗时 ${rightSeconds}。`);
+      setBattleStatus(`双侧 step 完成。左侧 ${leftSeconds}，右侧 ${rightSeconds}。`);
     }
 
     if (data.left.ended || data.left.truncated || data.right.ended || data.right.truncated) {
@@ -347,10 +408,12 @@ async function stepLoop() {
   } catch (err) {
     setBattleStatus(`Step 失败: ${err.message}`, true);
   } finally {
-    if (modelId === "mineworld") {
-      state.controls.camera_dx = 0;
-      state.controls.camera_dy = 0;
-      paintMineWorldCamera(0, 0);
+    for (const side of ["left", "right"]) {
+      if (modelIdForSide(side) === "mineworld") {
+        controlsForSide(side).camera_dx = 0;
+        controlsForSide(side).camera_dy = 0;
+        paintMineWorldCamera(side, 0, 0);
+      }
     }
     state.stepping = false;
   }
@@ -360,76 +423,58 @@ function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
 
-function cameraInversionForModel() {
-  const modelId = controlModelId();
+function cameraInversionForModel(modelId) {
   return SHARED_CONTROL_PROFILES[modelId] || SHARED_CONTROL_PROFILES.default;
 }
 
-function paintMineWorldCamera(dx, dy) {
+function knobForSide(side) {
+  return side === "left" ? el.leftCameraKnob : el.rightCameraKnob;
+}
+
+function stickForSide(side) {
+  return side === "left" ? el.leftCameraStick : el.rightCameraStick;
+}
+
+function paintKnob(side, dx, dy) {
   const size = 160;
   const knobSize = 54;
   const center = size / 2;
   const maxRadius = (size - knobSize) / 2;
   const x = center - knobSize / 2 + dx * maxRadius;
   const y = center - knobSize / 2 + dy * maxRadius;
-  el.cameraKnob.style.left = `${x}px`;
-  el.cameraKnob.style.top = `${y}px`;
+  const knob = knobForSide(side);
+  knob.style.left = `${x}px`;
+  knob.style.top = `${y}px`;
 }
 
-function updateWASDStyles() {
+function paintMineWorldCamera(side, dx, dy) {
+  paintKnob(side, dx, dy);
+}
+
+function centerAllKnobs() {
+  paintKnob("left", 0, 0);
+  paintKnob("right", 0, 0);
+}
+
+function updateAllControllerStyles() {
   document.querySelectorAll(".key").forEach((btn) => {
+    const side = btn.dataset.side;
     const key = btn.dataset.key;
-    btn.classList.toggle("active", !!state.controls[key]);
-  });
-}
-
-function bindKeyboard() {
-  const downMap = { w: "w", a: "a", s: "s", d: "d" };
-
-  window.addEventListener("keydown", (e) => {
-    const key = downMap[e.key.toLowerCase()];
-    if (!key) {
-      return;
-    }
-    state.controls[key] = true;
-    updateWASDStyles();
-  });
-
-  window.addEventListener("keyup", (e) => {
-    const key = downMap[e.key.toLowerCase()];
-    if (!key) {
-      return;
-    }
-    state.controls[key] = false;
-    updateWASDStyles();
-  });
-
-  window.addEventListener("blur", () => {
-    state.controls.w = false;
-    state.controls.a = false;
-    state.controls.s = false;
-    state.controls.d = false;
-    state.controls.l_click = false;
-    state.controls.r_click = false;
-    state.controls.camera_dx = 0;
-    state.controls.camera_dy = 0;
-    state.mineworldCameraActive = false;
-    state.mineworldCameraPointerId = null;
-    paintMineWorldCamera(0, 0);
-    updateWASDStyles();
+    btn.classList.toggle("active", !!controlsForSide(side)[key]);
   });
 }
 
 function bindWASDButtons() {
   document.querySelectorAll(".key").forEach((btn) => {
+    const side = btn.dataset.side;
     const key = btn.dataset.key;
     const press = () => {
-      state.controls[key] = true;
-      updateWASDStyles();
+      controlsForSide(side)[key] = true;
+      updateAllControllerStyles();
     };
     const release = () => {
-      state.controls[key] = false;
-      updateWASDStyles();
+      controlsForSide(side)[key] = false;
+      updateAllControllerStyles();
     };
     btn.addEventListener("pointerdown", press);
     btn.addEventListener("pointerup", release);
@@ -438,21 +483,13 @@ function bindWASDButtons() {
   });
 }
 
-function bindCameraStick() {
-  const stick = el.cameraStick;
-  const knob = el.cameraKnob;
+function bindCameraStick(side) {
+  const stick = stickForSide(side);
   const size = 160;
   const knobSize = 54;
   const center = size / 2;
   const maxRadius = (size - knobSize) / 2;
   let active = false;
-
-  const paint = (dx, dy) => {
-    const x = center - knobSize / 2 + dx * maxRadius;
-    const y = center - knobSize / 2 + dy * maxRadius;
-    knob.style.left = `${x}px`;
-    knob.style.top = `${y}px`;
-  };
 
   const setFromPointer = (clientX, clientY) => {
     const rect = stick.getBoundingClientRect();
@@ -460,44 +497,43 @@ function bindCameraStick() {
     const y = clientY - rect.top - center;
     const len = Math.hypot(x, y);
     const scale = len > maxRadius ? maxRadius / len : 1;
-
     const nx = (x * scale) / maxRadius;
     const ny = (y * scale) / maxRadius;
-    const inv = cameraInversionForModel();
-    state.controls.camera_dx = Number((inv.invertX ? -nx : nx).toFixed(3));
-    state.controls.camera_dy = Number((inv.invertY ? -ny : ny).toFixed(3));
-    paint(nx, ny);
+    const inv = cameraInversionForModel(modelIdForSide(side));
+    controlsForSide(side).camera_dx = Number((inv.invertX ? -nx : nx).toFixed(3));
+    controlsForSide(side).camera_dy = Number((inv.invertY ? -ny : ny).toFixed(3));
+    paintKnob(side, nx, ny);
   };
 
   const resetStick = () => {
-    state.controls.camera_dx = 0;
-    state.controls.camera_dy = 0;
-    paint(0, 0);
+    controlsForSide(side).camera_dx = 0;
+    controlsForSide(side).camera_dy = 0;
+    paintKnob(side, 0, 0);
   };
 
   const resetMineWorldStick = () => {
-    state.controls.camera_dx = 0;
-    state.controls.camera_dy = 0;
-    state.mineworldCameraActive = false;
-    state.mineworldCameraPointerId = null;
-    paintMineWorldCamera(0, 0);
+    controlsForSide(side).camera_dx = 0;
+    controlsForSide(side).camera_dy = 0;
+    state.sides[side].mineworldCameraActive = false;
+    state.sides[side].mineworldCameraPointerId = null;
+    paintMineWorldCamera(side, 0, 0);
   };
 
   const updateMineWorldFromDelta = (deltaX, deltaY) => {
     const nx = clamp((deltaX / maxRadius) * MINEWORLD_CAMERA_DELTA_GAIN, -MINEWORLD_CAMERA_MAX_DELTA, MINEWORLD_CAMERA_MAX_DELTA);
     const ny = clamp((deltaY / maxRadius) * MINEWORLD_CAMERA_DELTA_GAIN, -MINEWORLD_CAMERA_MAX_DELTA, MINEWORLD_CAMERA_MAX_DELTA);
-    const inv = cameraInversionForModel();
-    state.controls.camera_dx = Number((inv.invertX ? -nx : nx).toFixed(3));
-    state.controls.camera_dy = Number((inv.invertY ? -ny : ny).toFixed(3));
-    paintMineWorldCamera(nx, ny);
+    const inv = cameraInversionForModel(modelIdForSide(side));
+    controlsForSide(side).camera_dx = Number((inv.invertX ? -nx : nx).toFixed(3));
+    controlsForSide(side).camera_dy = Number((inv.invertY ? -ny : ny).toFixed(3));
+    paintMineWorldCamera(side, nx, ny);
   };
 
   stick.addEventListener("pointerdown", (e) => {
-    if (controlModelId() === "mineworld") {
-      state.mineworldCameraActive = true;
-      state.mineworldCameraPointerId = e.pointerId;
-      state.mineworldCameraLastX = e.clientX;
-      state.mineworldCameraLastY = e.clientY;
+    if (modelIdForSide(side) === "mineworld") {
+      state.sides[side].mineworldCameraActive = true;
+      state.sides[side].mineworldCameraPointerId = e.pointerId;
+      state.sides[side].mineworldCameraLastX = e.clientX;
+      state.sides[side].mineworldCameraLastY = e.clientY;
       stick.setPointerCapture?.(e.pointerId);
       return;
     }
@@ -506,14 +542,14 @@ function bindCameraStick() {
   });
 
   window.addEventListener("pointermove", (e) => {
-    if (controlModelId() === "mineworld") {
-      if (!state.mineworldCameraActive || state.mineworldCameraPointerId !== e.pointerId) {
+    if (modelIdForSide(side) === "mineworld") {
+      if (!state.sides[side].mineworldCameraActive || state.sides[side].mineworldCameraPointerId !== e.pointerId) {
         return;
       }
-      const deltaX = e.clientX - state.mineworldCameraLastX;
-      const deltaY = e.clientY - state.mineworldCameraLastY;
-      state.mineworldCameraLastX = e.clientX;
-      state.mineworldCameraLastY = e.clientY;
+      const deltaX = e.clientX - state.sides[side].mineworldCameraLastX;
+      const deltaY = e.clientY - state.sides[side].mineworldCameraLastY;
+      state.sides[side].mineworldCameraLastX = e.clientX;
+      state.sides[side].mineworldCameraLastY = e.clientY;
       updateMineWorldFromDelta(deltaX, deltaY);
       return;
     }
@@ -524,11 +560,11 @@ function bindCameraStick() {
   });
 
   const end = (e) => {
-    if (controlModelId() === "mineworld") {
-      if (!state.mineworldCameraActive) {
+    if (modelIdForSide(side) === "mineworld") {
+      if (!state.sides[side].mineworldCameraActive) {
         return;
       }
-      if (e && state.mineworldCameraPointerId !== null && e.pointerId !== state.mineworldCameraPointerId) {
+      if (e && state.sides[side].mineworldCameraPointerId !== null && e.pointerId !== state.sides[side].mineworldCameraPointerId) {
         return;
       }
       resetMineWorldStick();
@@ -576,9 +612,9 @@ function bindEvents() {
   el.startFloatingBtn.addEventListener("click", onStartBattle);
   el.resetBtn.addEventListener("click", onResetBattle);
 
-  bindKeyboard();
   bindWASDButtons();
-  bindCameraStick();
+  bindCameraStick("left");
+  bindCameraStick("right");
 }
 
 async function boot() {
@@ -588,9 +624,10 @@ async function boot() {
     el.seedPreview.src = EMPTY_FRAME_DATA_URL;
     el.leftFrameView.src = EMPTY_FRAME_DATA_URL;
     el.rightFrameView.src = EMPTY_FRAME_DATA_URL;
+    centerAllKnobs();
     updateOverlay();
     setInterval(stepLoop, 80);
-    setBattleStatus("就绪：左右选择两个不同模型，上传共同初始图，然后开始对战。");
+    setBattleStatus("就绪：左右选择两个不同模型，上传共同初始图，然后分别使用下方控制器操作。");
   } catch (err) {
     setBattleStatus(`初始化失败: ${err.message}`, true);
   }

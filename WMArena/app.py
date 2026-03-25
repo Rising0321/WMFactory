@@ -87,7 +87,8 @@ class ArenaStartRequest(BaseModel):
 
 
 class ArenaStepRequest(BaseModel):
-    action: Dict[str, Any] = Field(default_factory=dict)
+    left_action: Dict[str, Any] = Field(default_factory=dict)
+    right_action: Dict[str, Any] = Field(default_factory=dict)
 
 
 class ArenaResetRequest(BaseModel):
@@ -371,10 +372,9 @@ def arena_step(req: ArenaStepRequest) -> Dict[str, Any]:
     if state.left.session_id is None or state.right.session_id is None:
         raise HTTPException(status_code=400, detail="No active arena session")
 
-    action = dict(req.action)
     try:
-        left_result = _step_side(state.left, action)
-        right_result = _step_side(state.right, action)
+        left_result = _step_side(state.left, dict(req.left_action))
+        right_result = _step_side(state.right, dict(req.right_action))
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
