@@ -39,6 +39,7 @@ The repo already contains service wrappers and adapter surfaces for the followin
 | HY-WorldPlay | [Tencent-Hunyuan/HY-WorldPlay](https://github.com/Tencent-Hunyuan/HY-WorldPlay) |
 | Hunyuan-GameCraft-1.0 | [Tencent-Hunyuan/Hunyuan-GameCraft-1.0](https://github.com/Tencent-Hunyuan/Hunyuan-GameCraft-1.0) |
 | Matrix-Game | [SkyworkAI/Matrix-Game](https://github.com/SkyworkAI/Matrix-Game) |
+| Matrix-Game 3.0 | [SkyworkAI/Matrix-Game](https://github.com/SkyworkAI/Matrix-Game) |
 | Vid2World | [thuml/Vid2World](https://github.com/thuml/Vid2World) |
 | MineWorld | [microsoft/mineworld](https://github.com/microsoft/mineworld) |
 | WHAM | [microsoft/wham](https://huggingface.co/microsoft/wham) |
@@ -144,7 +145,7 @@ python -m uvicorn server:app --host 0.0.0.0 --port 8081
 Then open the web app, select a model, select or upload an image, and start stepping through the generated world.
 
 
-### Add Models with LLM-Assisted Workflow
+### Add Models with Vibe Coding
 
 We strongly recommend using the prompts in [`prompts/`](./prompts) together with Claude Code or Codex for vibe coding when adding a new model to WMFactory.
 

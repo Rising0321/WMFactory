@@ -84,6 +84,12 @@ models/**/.gradio/
 /models/Matrix-Game/Matrix-Game-2/assets/pdf/
 /models/Matrix-Game/Matrix-Game-2/demo_images/
 /models/Matrix-Game/Matrix-Game-1/assets/videos/
+/models/Matrix-Game-3.0/README.md
+/models/Matrix-Game-3.0/assets/
+/models/Matrix-Game-3.0/demo_images/
+/models/Matrix-Game-3.0/output/
+/models/Matrix-Game-3.0/Matrix-Game-3.0/
+/models/Matrix-Game-3.0/test.sh
 /models/Vid2World/assets/long_rollout/
 /models/Vid2World/assets/v2w_overview.png
 /models/Hunyuan-GameCraft-1.0/asset/teaser.png

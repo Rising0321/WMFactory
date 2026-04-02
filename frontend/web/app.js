@@ -143,7 +143,7 @@ function preferredDatasetForModel(modelId) {
 }
 
 function isChunkedModel(modelId) {
-  return modelId === "yume" || modelId === "infinite-world" || modelId === "gamecraft" || modelId === "worldplay" || modelId === "lingbot-world";
+  return modelId === "yume" || modelId === "infinite-world" || modelId === "gamecraft" || modelId === "worldplay" || modelId === "lingbot-world" || modelId === "matrixgame3";
 }
 
 function isLatencyModel(modelId) {
@@ -165,6 +165,9 @@ function chunkedModelLabel(modelId) {
   }
   if (modelId === "lingbot-world") {
     return "LingBot-World";
+  }
+  if (modelId === "matrixgame3") {
+    return "Matrix-Game 3.0";
   }
   return "Chunked Model";
 }
@@ -348,6 +351,9 @@ function cameraInversionForModel() {
   }
   if (state.modelId === "matrixgame") {
     return { invertX: false, invertY: false };
+  }
+  if (state.modelId === "matrixgame3") {
+    return { invertX: false, invertY: true };
   }
   if (state.modelId === "open-oasis") {
     return { invertX: false, invertY: false };

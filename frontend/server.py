@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from adapters import DiamondAdapter, GameCraftAdapter, InfiniteWorldAdapter, LingBotWorldAdapter, MatrixGameAdapter, MineWorldAdapter, OpenOasisAdapter, Vid2WorldAdapter, WhamAdapter, WonderWorldAdapter, WorldFMAdapter, WorldPlayAdapter, YumeAdapter
+from adapters import DiamondAdapter, GameCraftAdapter, InfiniteWorldAdapter, LingBotWorldAdapter, MatrixGameAdapter, MatrixGame3Adapter, MineWorldAdapter, OpenOasisAdapter, Vid2WorldAdapter, WhamAdapter, WonderWorldAdapter, WorldFMAdapter, WorldPlayAdapter, YumeAdapter
 
 
 ROOT = Path(__file__).resolve().parent
@@ -58,6 +58,7 @@ class AppState:
             "wham": WhamAdapter(),
             "mineworld": MineWorldAdapter(),
             "matrixgame": MatrixGameAdapter(),
+            "matrixgame3": MatrixGame3Adapter(),
             "yume": YumeAdapter(),
             "worldplay": WorldPlayAdapter(),
             "open-oasis": OpenOasisAdapter(),
@@ -181,6 +182,12 @@ def list_models() -> Dict[str, Any]:
                 "label": "Matrix-Game 2.0",
                 "status": "available",
                 "description": "Streaming interactive world model with WASD and camera control.",
+            },
+            {
+                "id": "matrixgame3",
+                "label": "Matrix-Game 3.0",
+                "status": "available",
+                "description": "Chunked interactive world model with native Matrix-Game-3.0 action rollout and unified WASD/camera adaptation.",
             },
             {
                 "id": "wonderworld",
