@@ -10,6 +10,7 @@
 
 # Third-party model repos to keep local only
 /models/WonderWorld/
+/research/reference/
 
 # Python cache/build artifacts
 __pycache__/
@@ -46,6 +47,10 @@ Thumbs.db
 *.err
 *.tmp
 *.temp
+/WMArena/*.sqlite3
+/WMArena/logs/
+/WMArena/__pycache__/
+/frontend/__pycache__/
 
 # Large generated media / arrays
 *.mp4

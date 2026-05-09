@@ -103,13 +103,26 @@ That is the heart of the project: one interaction language, many model implement
 
 ```text
 WMFactory
-├── data/        # datasets and image sources
-├── models/      # local model repos and integration targets
-├── frontend/    # unified web frontend + gateway server
-├── services/    # per-model runtime services
-├── utils/       # shared utilities
-└── changeLog/   # local diffs against model origins
+├── frontend/            # unified web frontend + gateway server
+├── WMArena/             # arena-style comparison app
+├── demoImage/           # shared demo inputs for world-model smoke tests
+├── vllm-wm/             # standalone unified backend for WMFactory 0.5
+├── models/              # local model repos and integration targets
+├── services/            # per-model runtime services used by the gateway
+├── prompts/             # reproducible onboarding prompts for new models
+├── docs/                # architecture notes and per-model changelogs
+├── research/reference/  # local reference repos kept outside the main product path
+├── data/                # local datasets (gitignored)
+├── outputs/             # local outputs (gitignored)
+└── venvs/               # local environments (gitignored)
 ```
+
+Recommended focus for active product work:
+
+- `frontend/` remains the main unified experience layer.
+- `WMArena/` remains the comparison and evaluation surface.
+- `vllm-wm/` is the new standalone backend direction for WMFactory 0.5.
+- `demoImage/` holds reusable regression inputs shared by services and backends.
 
 ## Frontend Design Goal
 
@@ -275,7 +288,8 @@ The goal is to increase expressiveness without losing the simplicity of the unif
 ## Notes
 
 - `models/` stores local model repos and may differ from the original upstreams.
-- `changeLog/` records what changed relative to model origins.
+- `docs/changeLog/` records what changed relative to model origins.
+- `research/reference/` is for local study/reference repos and is intentionally not part of the main release surface.
 - large local outputs, caches, checkpoints, and datasets are intentionally ignored by Git.
 
 ## Citation / Credit
