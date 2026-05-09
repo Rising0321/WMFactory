@@ -1,0 +1,10 @@
+include README.md
+include VENDORS.md
+recursive-include services *
+recursive-include vendors *
+recursive-include assets *
+prune checkpoints
+prune data
+exclude vendors/openoasis/*.safetensors
+global-exclude __pycache__
+global-exclude *.py[cod]
