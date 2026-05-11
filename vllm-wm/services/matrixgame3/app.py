@@ -25,8 +25,38 @@ from pydantic import BaseModel
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = PROJECT_ROOT.parent
 MODEL_ROOT = PROJECT_ROOT / "vendors" / "matrixgame3"
 MATRIXGAME3_CHECKPOINT_ROOT = PROJECT_ROOT / "checkpoints" / "matrixgame3"
+
+
+def _resolve_matrixgame3_preload_image() -> Path:
+    """Preload image for /load warm-up: repo frontImage/ by default, else legacy assets path."""
+    env = os.getenv("WM_MATRIXGAME3_PRELOAD_IMAGE")
+    if env:
+        return Path(env).resolve()
+    front_dir = REPO_ROOT / "demoImage"
+    if front_dir.is_dir():
+        preferred = (
+            "read.png",
+            "input.jpeg",
+            "input.png",
+            "i2v_input.JPG",
+            "cover.jpg",
+            "front.png",
+            "front.jpg",
+        )
+        for name in preferred:
+            candidate = front_dir / name
+            if candidate.is_file():
+                return candidate.resolve()
+        exts = {".jpg", ".jpeg", ".png", ".webp"}
+        files = sorted(
+            p for p in front_dir.iterdir() if p.is_file() and p.suffix.lower() in exts
+        )
+        if files:
+            return files[0].resolve()
+    return (PROJECT_ROOT / "assets" / "i2v_input.JPG").resolve()
 
 PROMPT_TOKEN = "Please input the mouse action"
 
@@ -93,9 +123,7 @@ class MatrixGame3RuntimeService:
             os.getenv("WM_MATRIXGAME3_SESSION_DIR", str(PROJECT_ROOT / "outputs" / "matrixgame3" / "sessions"))
         ).resolve()
         self.session_root.mkdir(parents=True, exist_ok=True)
-        self.preload_image_path = Path(
-            os.getenv("WM_MATRIXGAME3_PRELOAD_IMAGE", str(PROJECT_ROOT / "assets" / "i2v_input.JPG"))
-        ).resolve()
+        self.preload_image_path = _resolve_matrixgame3_preload_image()
 
         self.python_bin = os.getenv(
             "WM_MATRIXGAME3_PYTHON",
@@ -125,7 +153,7 @@ class MatrixGame3RuntimeService:
         self.start_timeout = float(os.getenv("WM_MATRIXGAME3_START_TIMEOUT", "1800"))
         self.step_timeout = float(os.getenv("WM_MATRIXGAME3_STEP_TIMEOUT", "900"))
         self.camera_deadzone = float(os.getenv("WM_MATRIXGAME3_CAMERA_DEADZONE", "0.08"))
-        self.camera_scale = float(os.getenv("WM_MATRIXGAME3_CAMERA_SCALE", "0.1"))
+        self.camera_scale = float(os.getenv("WM_MATRIXGAME3_CAMERA_SCALE", "0.05"))
         self.use_base_model = os.getenv("WM_MATRIXGAME3_USE_BASE_MODEL", "1") == "1"
         self._progress_lock = threading.Lock()
         self._progress: Dict[str, Any] = {
@@ -603,7 +631,7 @@ class MatrixGame3RuntimeService:
         if abs(camera_dy) <= self.camera_deadzone:
             camera_dy = 0.0
 
-        pitch = max(-1.0, min(1.0, camera_dy)) * self.camera_scale
+        pitch = -max(-1.0, min(1.0, camera_dy)) * self.camera_scale
         yaw = max(-1.0, min(1.0, camera_dx)) * self.camera_scale
         if abs(pitch) < 1e-6 and abs(yaw) < 1e-6:
             return "u", "U", {"pitch": 0.0, "yaw": 0.0}

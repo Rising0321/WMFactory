@@ -1,1 +1,0 @@
-# infworld/configs package

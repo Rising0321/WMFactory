@@ -1,310 +1,118 @@
-# Unified Operator on Interactive World Model
+# WMFactory 0.5
 
-<p align="center">
-  <a href="https://www.youtube.com/watch?v=loq5VTAmgeo">
-    <img src="./assets/VideoFinal-%E5%B0%81%E9%9D%A2.jpg" alt="Unified Operator on Interactive World Model Demo Video" width="720">
-  </a>
-</p>
+One environment. One command. Eleven interactive world models.
 
-<p align="center">
-  <a href="https://www.youtube.com/watch?v=loq5VTAmgeo"><strong>Watch Demo Video on YouTube</strong></a>
-</p>
+`WMFactory 0.5` is a major update of the WMFactory project. Its main goal is to remove the old per-model environment fragmentation and replace it with a single backend, a single shared runtime environment, and a single serving interface for many different world models.
 
-**One frontend. Many world models. One place to compare how interactive worlds actually feel.**
+At the project level, `WMFactory` is the full repository. The current backend implementation lives in `vllm-wm/`.
 
-Unified Operator on Interactive World Model is an attempt to build a shared interface layer for a new class of generative systems: models that do not just produce videos, but produce a world you can enter, steer, and evaluate.
+## Project Goal
 
-In this project, a "World Model" means a model in the spirit of Genie-style interactive generation, HunyuanWorld, World Labs, or Vid2World: you provide an image or text prompt, then interact with the generated world through movement and camera control. The ambition here is simple:
+This repository is built around one practical promise:
 
-- choose a model
-- choose a dataset image or upload your own image
-- enter the world
-- move with `WASD`
-- look around by dragging
-- compare different world models under one consistent interface
+- 1 shared environment
+- 1 backend entrypoint
+- 1 consistent session API
+- 11 different interactive world models
 
-That makes this repo both a product surface and an evaluation surface. In the same way that arena-style systems made LLM comparison intuitive, this project aims to make interactive world-model comparison legible to both researchers and normal users.
+The focus is not to force every model into the same architecture. The focus is to make them usable from one unified system.
 
 
-## Supported Models and Services
+## Unified Environment
 
-The repo already contains service wrappers and adapter surfaces for the following model families:
+The backend is designed around one shared Python environment.
 
-| Model | Upstream |
-| --- | --- |
-| WorldFM | [inspatio/worldfm](https://github.com/inspatio/worldfm) |
-| Infinite-World | [MeiGen-AI/Infinite-World](https://github.com/MeiGen-AI/Infinite-World) |
-| LingBot-World | [Robbyant/lingbot-world](https://github.com/Robbyant/lingbot-world) |
-| YUME | [stdstu12/YUME](https://github.com/stdstu12/YUME) |
-| HY-WorldPlay | [Tencent-Hunyuan/HY-WorldPlay](https://github.com/Tencent-Hunyuan/HY-WorldPlay) |
-| Hunyuan-GameCraft-1.0 | [Tencent-Hunyuan/Hunyuan-GameCraft-1.0](https://github.com/Tencent-Hunyuan/Hunyuan-GameCraft-1.0) |
-| Matrix-Game | [SkyworkAI/Matrix-Game](https://github.com/SkyworkAI/Matrix-Game) |
-| Matrix-Game 3.0 | [SkyworkAI/Matrix-Game](https://github.com/SkyworkAI/Matrix-Game) |
-| Vid2World | [thuml/Vid2World](https://github.com/thuml/Vid2World) |
-| MineWorld | [microsoft/mineworld](https://github.com/microsoft/mineworld) |
-| WHAM | [microsoft/wham](https://huggingface.co/microsoft/wham) |
-| Open-Oasis | [etched-ai/open-oasis](https://github.com/etched-ai/open-oasis) |
-| Diamond | [eloialonso/diamond](https://github.com/eloialonso/diamond) |
+Recommended stack:
 
-The project is deliberately structured so new world models can be plugged in without redesigning the frontend.
+- Python `3.12`
+- PyTorch `2.9.0`
+- Transformers `4.57.3`
+- Diffusers `0.37.1`
 
+Recommended install(Make sure the python version is 3.12):
 
-## Why This Project Exists
-
-Most world-model papers and releases still ship with isolated demos, custom launch scripts, custom controls, and incompatible runtime assumptions.
-
-That makes three things unnecessarily hard:
-
-1. comparing different models under the same interaction protocol
-2. turning research prototypes into something people can actually try
-3. building a reusable benchmark surface for interactive world generation
-
-This repo solves that by treating the frontend as a stable contract and every model as an adapter-backed runtime.
-
-## What Makes It Unified
-
-- The frontend talks to one API, not to individual model codebases.
-- Each model runs in its own environment or service.
-- Adapters translate one shared interaction schema into model-specific runtime calls.
-- The user experience stays stable even when the backends are completely different.
-
-## Unified Interaction Contract
-
-The frontend is built around a consistent interaction loop:
-
-- `GET /api/models`
-- `POST /api/models/load`
-- `POST /api/sessions/start`
-- `POST /api/sessions/step`
-- `POST /api/sessions/reset`
-
-Each model adapter implements the same abstract shape:
-
-```python
-class WorldModelAdapter(ABC):
-    model_id: str
-    def load(self): ...
-    def start_session(self, init_image_bytes): ...
-    def reset_session(self, init_image_bytes): ...
-    def step(self, action): ...
+```bash
+python -m pip install -r requirements.txt
 ```
 
-And each runtime returns the same core frame payload:
-
-- `frame_base64`
-- `reward`
-- `ended`
-- `truncated`
-- `extra`
-
-That is the heart of the project: one interaction language, many model implementations.
-
-## Current Repo Layout
-
-```text
-WMFactory
-├── frontend/            # unified web frontend + gateway server
-├── WMArena/             # arena-style comparison app
-├── demoImage/           # shared demo inputs for world-model smoke tests
-├── vllm-wm/             # standalone unified backend for WMFactory 0.5
-├── models/              # local model repos and integration targets
-├── services/            # per-model runtime services used by the gateway
-├── prompts/             # reproducible onboarding prompts for new models
-├── docs/                # architecture notes and per-model changelogs
-├── research/reference/  # local reference repos kept outside the main product path
-├── data/                # local datasets (gitignored)
-├── outputs/             # local outputs (gitignored)
-└── venvs/               # local environments (gitignored)
-```
-
-Recommended focus for active product work:
-
-- `frontend/` remains the main unified experience layer.
-- `WMArena/` remains the comparison and evaluation surface.
-- `vllm-wm/` is the new standalone backend direction for WMFactory 0.5.
-- `demoImage/` holds reusable regression inputs shared by services and backends.
-
-## Frontend Design Goal
-
-The frontend is not meant to be just another paper demo.
-
-It is meant to become:
-
-- a unified launcher for interactive world models
-- a shared human evaluation surface
-- a reusable integration target for future models
-- a bridge between model release code and actual user experience
-
-## Supported Integration Pattern
-
-The recommended path for every new model is:
-
-1. keep the web UI unchanged
-2. add a dedicated service under `services/`
-3. add a gateway adapter under `frontend/adapters/`
-4. map the shared action schema into the model's own action space
-
-This avoids dependency conflicts, keeps environments isolated, and preserves one stable frontend.
+`flash-attn` is required. If the normal pip install fails, install the matching Dao-AILab wheel manually, then continue.
 
 ## Quick Start
 
-Run the gateway from the frontend directory:
+### Start the backend
 
 ```bash
-cd frontend
-python -m uvicorn server:app --host 0.0.0.0 --port 8081
+cd vllm-wm
+python serve.py
 ```
 
-Then open the web app, select a model, select or upload an image, and start stepping through the generated world.
+### Load one model
 
-
-### Add Models with Vibe Coding
-
-We strongly recommend using the prompts in [`prompts/`](./prompts) together with Claude Code or Codex for vibe coding when adding a new model to WMFactory.
-
-To improve the success rate of reproduction and integration, we found that the process becomes much more reliable if it is broken into three small and easy sub-tasks:
-
-- [`prompts/step1.md`](./prompts/step1.md)
-  - Ask the LLM to reproduce the model first and make sure it can successfully generate a video.
-- [`prompts/step2.md`](./prompts/step2.md)
-  - Ask the LLM to extract the interfaces needed for WMFactory integration and provide a rough speed estimate.
-- [`prompts/step3.md`](./prompts/step3.md)
-  - Ask the LLM to actually plug the world model into WMFactory.
-
-In practice, feeding these three prompts to a strong coding model in the same running context gives a surprisingly high success rate for onboarding a new world model into WMFactory.
-
-
-## Controls
-
-- `W / A / S / D`: movement
-- drag mouse: camera control
-
-
-
-## Research Use Case
-
-This project is especially useful if you care about questions like:
-
-- Which world model feels most controllable under the same interface?
-- Which model preserves scene identity after repeated actions?
-- Which model breaks first under long-horizon interaction?
-- How should we benchmark world generation beyond offline videos?
-
-This is why the frontend matters. It is not decoration. It is the evaluation instrument.
-
-
-## Demos
-
-GitHub README rendering does not reliably inline local `mp4` playback, so the demo videos are linked as preview files:
-
-| Demo | Preview |
-| --- | --- |
-| World | [Open preview](./assets/2_worldfm.mp4) |
-| MatrixWorld | [Open preview](./assets/6_MatrixGame.mp4) |
-| Diamond | [Open preview](./assets/1_diamond.mp4) |
-
-## System Architecture
-
-```mermaid
-flowchart TD
-    U[User]
-
-    subgraph Experience Layer
-        FE[Unified Web Frontend<br/>frontend/web]
-    end
-
-    subgraph Gateway Layer
-        GW[Gateway API<br/>frontend/server.py]
-        AD[Model Adapters<br/>frontend/adapters]
-    end
-
-    subgraph Runtime Layer
-        S[Per-Model Runtime Services]
-    end
-
-    subgraph Model Layer
-        M1[Model Repositories]
-        M2[Weights / Checkpoints / Assets]
-    end
-
-    subgraph Data Layer
-        DS[Datasets / Uploaded Images]
-    end
-
-    U --> FE
-    FE --> GW
-    DS --> GW
-    GW --> AD
-    AD --> S
-    S --> M1
-    M2 --> M1
-    S --> GW
-    GW --> FE
+```bash
+curl -X POST http://127.0.0.1:9100/models/load \
+  -H 'Content-Type: application/json' \
+  -d '{"model_id":"matrixgame"}'
 ```
 
+### Start a session
 
-
-## To Do List
-
-### 1. Evolve Into an Arena-Style Evaluation Platform
-
-The long-term goal is to push this project beyond a multi-model demo site and toward a fair comparison platform in the spirit of LLM Arena.
-
-The ideal future interaction would be:
-
-- users play two anonymous world models
-- both models receive the same input condition
-- both models are evaluated through the same control protocol
-- users decide which world they prefer
-
-If this becomes reliable and widely adopted, the platform can do more than host demos. It can become a public benchmark surface and potentially help define a standard interface for interactive world models.
-
-### 2. Connect More Models, Including Non-Open Models
-
-At the moment, the platform mainly supports open-source world models. A major development direction is to support more external and heterogeneous model providers.
-
-This includes:
-
-- hosted inference endpoints
-- closed-source model APIs
-- proprietary runtimes wrapped through adapters
-- service bridges that preserve the same frontend contract
-
-The core challenge is not only connecting more systems, but keeping them all inside one unified interaction protocol.
-
-### 3. Support Richer Action Spaces
-
-The current platform already supports a useful core interaction loop centered on movement and camera control, but future versions should support a broader set of actions.
-
-That includes:
-
-- more detailed movement primitives
-- more game-like discrete controls
-- richer interaction actions beyond navigation
-- model-specific action mappings under the same frontend abstraction
-
-The goal is to increase expressiveness without losing the simplicity of the unified interface.
-
-## Notes
-
-- `models/` stores local model repos and may differ from the original upstreams.
-- `docs/changeLog/` records what changed relative to model origins.
-- `research/reference/` is for local study/reference repos and is intentionally not part of the main release surface.
-- large local outputs, caches, checkpoints, and datasets are intentionally ignored by Git.
-
-## Citation / Credit
-
-This project stands on top of many excellent model repos from the world-model ecosystem. The purpose here is not to replace them, but to give them a common interaction surface.
-
-If you are building interactive world models and want a unified frontend target, this repo is exactly that direction.
-
-```bibtex
-@misc{wmfactory,
-  title  = {WMFactory: World Model Unified Frontend},
-  author = {Ruixing Zhang},
-  year   = {2026},
-  url    = {https://github.com/Rising0321/WMFactory}
-}
+```bash
+curl -X POST http://127.0.0.1:9100/sessions/start \
+  -H 'Content-Type: application/json' \
+  -d '{"model_id":"matrixgame","init_image_base64":"data:image/png;base64,..."}'
 ```
 
-Special thanks to the authors of [OpenWorldLib](https://github.com/OpenDCAI/OpenWorldLib) for their work and for the discussions that helped shape this project.
+### Step the world
+
+```bash
+curl -X POST http://127.0.0.1:9100/sessions/step \
+  -H 'Content-Type: application/json' \
+  -d '{"session_id":"<session-id>","action":{"w":true}}'
+```
+
+Common action examples:
+
+- forward: `{"w": true}`
+- left: `{"a": true}`
+- right: `{"d": true}`
+- camera up: `{"camera_dy": -1.0}`
+- camera right: `{"camera_dx": 1.0}`
+
+The transport format is unified. Exact action semantics remain model-specific.
+
+## Testing
+
+Full rollout regression:
+
+```bash
+cd vllm-wm
+PYTHONNOUSERSITE=1 python scripts/verify_demo_outputs.py
+```
+
+Each successful model rollout writes results into `vllm-wm/testOutput/<model>/`.
+
+## Supported Models
+
+The current backend covers eleven models.
+
+| Model | Upstream Repository | Download Command |
+| --- | --- | --- |
+| `matrixgame` (Matrix-Game 2.0) | `https://github.com/SkyworkAI/Matrix-Game` | `huggingface-cli download Skywork/Matrix-Game-2.0 --local-dir vllm-wm/checkpoints/matrixgame2` |
+| `matrixgame3` (Matrix-Game 3.0) | `https://github.com/SkyworkAI/Matrix-Game-3.0` | `huggingface-cli download Skywork/Matrix-Game-3.0 --local-dir vllm-wm/checkpoints/matrixgame3` |
+| `yume` (YUME 1.5) | `https://github.com/stdstu12/YUME` | `huggingface-cli download stdstu123/Yume-5B-720P --local-dir vllm-wm/checkpoints/yume/Yume-5B-720P`<br>`huggingface-cli download OpenGVLab/InternVL3-2B-Instruct --local-dir vllm-wm/checkpoints/yume/InternVL3-2B-Instruct` |
+| `diamond` | `https://github.com/eloialonso/diamond` | `huggingface-cli download eloialonso/diamond --include "csgo/*" --local-dir vllm-wm/checkpoints/diamond` |
+| `open-oasis` | `https://github.com/etched-ai/open-oasis` | `huggingface-cli download Etched/oasis-500m oasis500m.safetensors --local-dir vllm-wm/checkpoints/openoasis`<br>`huggingface-cli download Etched/oasis-500m vit-l-20.safetensors --local-dir vllm-wm/checkpoints/openoasis` |
+| `wham` | `TODO` | `huggingface-cli download microsoft/WHAM models/WHAM_200M.ckpt --local-dir vllm-wm/checkpoints/wham` |
+| `vid2world` | `https://github.com/thuml/Vid2World` | `huggingface-cli download thuml/Vid2World-CSGO --local-dir vllm-wm/checkpoints/vid2world/Vid2World-CSGO` |
+| `infinite-world` | `TODO` | `huggingface-cli download MeiGen-AI/Infinite-World --local-dir vllm-wm/checkpoints/infiniteworld` |
+| `worldplay` (HY-WorldPlay 5B) | `https://github.com/Tencent-Hunyuan/HY-WorldPlay` | `huggingface-cli download tencent/HY-WorldPlay --include "wan_transformer/*" --local-dir vllm-wm/checkpoints/worldplay/HY-WorldPlay`<br>`huggingface-cli download tencent/HY-WorldPlay --include "wan_distilled_model/model.pt" --local-dir vllm-wm/checkpoints/worldplay/HY-WorldPlay`<br>`huggingface-cli download tencent/HunyuanVideo-1.5 --local-dir vllm-wm/checkpoints/worldplay/Wan2.2-TI2V-5B-Diffusers` |
+| `mineworld` | `https://github.com/microsoft/mineworld` | `TODO: fill with the public Hugging Face checkpoint command once the release path is stable` |
+| `lingbot-world-fast` | `https://github.com/robbyant/lingbot-world` | `huggingface-cli download robbyant/lingbot-world-base-cam --local-dir vllm-wm/checkpoints/lingbotworld/lingbot-world-base-cam`<br>`huggingface-cli download robbyant/lingbot-world-fast --local-dir vllm-wm/checkpoints/lingbotworld/lingbot-world-base-cam/lingbot_world_fast` |
+
+## Acknowledgments
+
+The unified backend design is inspired by [vLLM](https://github.com/vllm-project/vllm), adapted here for interactive world models rather than LLM token serving.
+
+The implementation also builds on [nano-vllm-omni](https://github.com/Rising0321/nano-vllm-omni) and related discussion around unified multimodal runtime design.
+
+The author of [OpenWorldLib](https://github.com/OpenDCAI/OpenWorldLib) for the discussion and inspiration.

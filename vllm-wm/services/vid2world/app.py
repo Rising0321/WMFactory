@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+from contextlib import nullcontext
 import io
 import os
 import sys
@@ -114,6 +115,7 @@ class Runtime:
     history_steps: int
     action_dim: int
     ddim_steps: int
+    timestep_spacing: str
     guidance_scale: float
     guidance_rescale: float
     fps: int
@@ -191,11 +193,12 @@ class Vid2WorldRuntimeService:
 
         history_steps = int(os.getenv("WM_VID2WORLD_HISTORY_STEPS", "9"))
         ddim_steps = int(os.getenv("WM_VID2WORLD_DDIM_STEPS", "50"))
+        timestep_spacing = os.getenv("WM_VID2WORLD_TIMESTEP_SPACING", "uniform_trailing")
         guidance_scale = float(os.getenv("WM_VID2WORLD_GUIDANCE_SCALE", "2.5"))
         guidance_rescale = float(os.getenv("WM_VID2WORLD_GUIDANCE_RESCALE", "0.7"))
         fps = int(os.getenv("WM_VID2WORLD_FPS", "3"))
-        mouse_gain_x = float(os.getenv("WM_VID2WORLD_MOUSE_GAIN_X", "60"))
-        mouse_gain_y = float(os.getenv("WM_VID2WORLD_MOUSE_GAIN_Y", "50"))
+        mouse_gain_x = float(os.getenv("WM_VID2WORLD_MOUSE_GAIN_X", "200"))
+        mouse_gain_y = float(os.getenv("WM_VID2WORLD_MOUSE_GAIN_Y", "100"))
         action_dim = int(config.model.params.unet_config.params.action_dim)
 
         self.runtime = Runtime(
@@ -204,6 +207,7 @@ class Vid2WorldRuntimeService:
             history_steps=history_steps,
             action_dim=action_dim,
             ddim_steps=ddim_steps,
+            timestep_spacing=timestep_spacing,
             guidance_scale=guidance_scale,
             guidance_rescale=guidance_rescale,
             fps=fps,
@@ -215,6 +219,7 @@ class Vid2WorldRuntimeService:
             "status": "loaded",
             "device": str(device),
             "ddim_steps": ddim_steps,
+            "timestep_spacing": timestep_spacing,
             "guidance_scale": guidance_scale,
             "guidance_rescale": guidance_rescale,
         }
@@ -223,22 +228,22 @@ class Vid2WorldRuntimeService:
         runtime = self._require_runtime()
         synthetic_history = False
         if seed_meta is not None:
-            history = self._history_from_seed_meta(seed_meta, runtime.history_steps)
+            history, action_history = self._history_and_actions_from_seed_meta(seed_meta, runtime.history_steps)
             frame_b64 = self._frame_to_base64(history[:, -1])
         else:
             init_bytes = self._decode_image(init_image_base64)
             if init_bytes is None:
-                history, frame_b64 = self._random_history_clip(runtime)
+                history, action_history, frame_b64 = self._random_history_clip(runtime)
             else:
                 history = self._history_from_image_bytes(init_bytes, runtime.history_steps)
+                action_history = self._neutral_action(runtime.device).unsqueeze(0).repeat(runtime.history_steps, 1).cpu()
                 frame_b64 = self._frame_to_base64(history[:, -1])
                 synthetic_history = True
 
-        neutral = self._neutral_action(runtime.device).unsqueeze(0).repeat(runtime.history_steps, 1)
         runtime.session = SessionState(
             session_id=str(uuid.uuid4()),
             video_history=history.unsqueeze(0).to(runtime.device, non_blocking=True),
-            action_history=neutral.unsqueeze(0),
+            action_history=action_history.unsqueeze(0).to(runtime.device, non_blocking=True),
             init_frame_base64=frame_b64,
             synthetic_history=synthetic_history,
             generated_steps=0,
@@ -250,20 +255,20 @@ class Vid2WorldRuntimeService:
         session = self._require_session(runtime, session_id)
         synthetic_history = False
         if seed_meta is not None:
-            history = self._history_from_seed_meta(seed_meta, runtime.history_steps)
+            history, action_history = self._history_and_actions_from_seed_meta(seed_meta, runtime.history_steps)
             frame_b64 = self._frame_to_base64(history[:, -1])
         else:
             init_bytes = self._decode_image(init_image_base64)
             if init_bytes is None:
-                history, frame_b64 = self._random_history_clip(runtime)
+                history, action_history, frame_b64 = self._random_history_clip(runtime)
             else:
                 history = self._history_from_image_bytes(init_bytes, runtime.history_steps)
+                action_history = self._neutral_action(runtime.device).unsqueeze(0).repeat(runtime.history_steps, 1).cpu()
                 frame_b64 = self._frame_to_base64(history[:, -1])
                 synthetic_history = True
 
-        neutral = self._neutral_action(runtime.device).unsqueeze(0).repeat(runtime.history_steps, 1)
         session.video_history = history.unsqueeze(0).to(runtime.device, non_blocking=True)
-        session.action_history = neutral.unsqueeze(0)
+        session.action_history = action_history.unsqueeze(0).to(runtime.device, non_blocking=True)
         session.init_frame_base64 = frame_b64
         session.synthetic_history = synthetic_history
         session.generated_steps = 0
@@ -274,7 +279,9 @@ class Vid2WorldRuntimeService:
         runtime = self._require_runtime()
         session = self._require_session(runtime, session_id)
 
-        with self._step_lock, torch.cuda.amp.autocast(dtype=torch.float16):
+        use_autocast = os.getenv("WM_VID2WORLD_USE_AUTOCAST", "0") == "1"
+        autocast_context = torch.amp.autocast("cuda", dtype=torch.float16) if use_autocast else nullcontext()
+        with self._step_lock, autocast_context:
             started = time.perf_counter()
             next_action = self._map_action(action, runtime).view(1, 1, -1)
             placeholder = session.video_history[:, :, -1:, :, :]
@@ -298,6 +305,7 @@ class Vid2WorldRuntimeService:
                 cond_frame=runtime.history_steps,
                 guidance_rescale=runtime.guidance_rescale,
                 sampled_img_num=1,
+                timestep_spacing=runtime.timestep_spacing,
             )
             next_frame = logs["samples"][:, :, -1:, :, :]
             session.video_history = torch.cat([session.video_history[:, :, 1:, :, :], next_frame], dim=2)
@@ -314,6 +322,7 @@ class Vid2WorldRuntimeService:
             "extra": {
                 "latency_ms": latency_ms,
                 "ddim_steps": runtime.ddim_steps,
+                "timestep_spacing": runtime.timestep_spacing,
                 "guidance_scale": runtime.guidance_scale,
                 "synthetic_history": session.synthetic_history,
                 "generated_steps": session.generated_steps,
@@ -324,7 +333,7 @@ class Vid2WorldRuntimeService:
         if dataset_id.lower() != "csgo":
             raise RuntimeError(f"Unsupported dataset for Vid2World: {dataset_id}")
         history_steps = self.runtime.history_steps if self.runtime is not None else int(os.getenv("WM_VID2WORLD_HISTORY_STEPS", "9"))
-        history, meta = self._random_history_clip_for_length(history_steps)
+        history, _, meta = self._random_history_clip_for_length(history_steps)
         preview = history[:, -1]
         return {
             "dataset_id": "CSGO",
@@ -333,42 +342,39 @@ class Vid2WorldRuntimeService:
             "extra": {"seed_meta": meta},
         }
 
-    def _random_history_clip(self, runtime: Runtime) -> Tuple[torch.Tensor, str]:
-        history, _ = self._random_history_clip_for_length(runtime.history_steps)
-        return history, self._frame_to_base64(history[:, -1])
+    def _random_history_clip(self, runtime: Runtime) -> Tuple[torch.Tensor, torch.Tensor, str]:
+        history, actions, _ = self._random_history_clip_for_length(runtime.history_steps)
+        return history, actions, self._frame_to_base64(history[:, -1])
 
-    def _random_history_clip_for_length(self, history_steps: int) -> Tuple[torch.Tensor, Dict[str, Any]]:
+    def _random_history_clip_for_length(self, history_steps: int) -> Tuple[torch.Tensor, torch.Tensor, Dict[str, Any]]:
         data_dir = Path(os.getenv("WM_VID2WORLD_DATA_DIR", str(DEFAULT_DATA_DIR)))
         files = sorted(p for p in data_dir.rglob("*.hdf5") if p.is_file())
         if not files:
             raise RuntimeError(f"No CSGO hdf5 files found under {data_dir}")
         path = files[np.random.randint(0, len(files))]
-        with h5py.File(path, "r") as handle:
-            frame_ids = sorted(
-                int(key.split("_")[1])
-                for key in handle.keys()
-                if key.startswith("frame_") and key.endswith("_x")
-            )
-            max_start = max(0, len(frame_ids) - history_steps)
-            start_idx = int(np.random.randint(0, max_start + 1))
-            frames = [
-                self._preprocess_csgo_frame(handle[f"frame_{idx}_x"][()])
-                for idx in range(start_idx, start_idx + history_steps)
-            ]
-        history = torch.stack(frames, dim=1)
-        return history, {"file": str(path), "start_idx": int(start_idx)}
+        max_start = 1000 - history_steps
+        start_idx = int(np.random.randint(0, max_start + 1))
+        history, actions = self._load_history_actions(path, start_idx, history_steps)
+        return history, actions, {"file": str(path), "start_idx": int(start_idx)}
 
-    def _history_from_seed_meta(self, seed_meta: Dict[str, Any], history_steps: int) -> torch.Tensor:
+    def _history_and_actions_from_seed_meta(self, seed_meta: Dict[str, Any], history_steps: int) -> Tuple[torch.Tensor, torch.Tensor]:
         path = Path(str(seed_meta["file"]))
         start_idx = int(seed_meta["start_idx"])
         if not path.exists():
             raise RuntimeError(f"Seed meta file does not exist: {path}")
+        return self._load_history_actions(path, start_idx, history_steps)
+
+    def _load_history_actions(self, path: Path, start_idx: int, history_steps: int) -> Tuple[torch.Tensor, torch.Tensor]:
         with h5py.File(path, "r") as handle:
             frames = [
                 self._preprocess_csgo_frame(handle[f"frame_{idx}_x"][()])
                 for idx in range(start_idx, start_idx + history_steps)
             ]
-        return torch.stack(frames, dim=1)
+            actions = [
+                torch.from_numpy(np.asarray(handle[f"frame_{idx}_y"][()], dtype=np.float32))
+                for idx in range(start_idx, start_idx + history_steps)
+            ]
+        return torch.stack(frames, dim=1), torch.stack(actions, dim=0)
 
     def _history_from_image_bytes(self, image_bytes: bytes, history_steps: int) -> torch.Tensor:
         image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
@@ -384,7 +390,7 @@ class Vid2WorldRuntimeService:
         return tensor
 
     def _preprocess_csgo_frame(self, frame: np.ndarray) -> torch.Tensor:
-        tensor = torch.from_numpy(frame.astype(np.float32)).permute(2, 0, 1)
+        tensor = torch.from_numpy(frame.astype(np.float32)).flip(2).permute(2, 0, 1)
         tensor = TF.resize(tensor, [275, 512], antialias=True)
         tensor = TF.center_crop(tensor, list(DEFAULT_RESOLUTION))
         tensor = (tensor / 255.0 - 0.5) * 2.0

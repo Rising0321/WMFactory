@@ -102,11 +102,8 @@ class YumeRuntimeService:
         self.vae_memory_optimization = os.getenv("WM_YUME_VAE_MEMORY_OPTIMIZATION", "1") == "1"
         self.refine_from_image = os.getenv("WM_YUME_REFINE_FROM_IMAGE", "0") == "1"
         self.camera_deadzone = float(os.getenv("WM_YUME_CAMERA_DEADZONE", "0.18"))
-        # Unified frontend already inverts the generic camera stick axes for
-        # non-MineWorld models. YUME needs the opposite interpretation, so
-        # compensate here by default.
-        self.invert_camera_x = os.getenv("WM_YUME_INVERT_CAMERA_X", "1") == "1"
-        self.invert_camera_y = os.getenv("WM_YUME_INVERT_CAMERA_Y", "1") == "1"
+        self.invert_camera_x = os.getenv("WM_YUME_INVERT_CAMERA_X", "0") == "1"
+        self.invert_camera_y = os.getenv("WM_YUME_INVERT_CAMERA_Y", "0") == "1"
 
     def _log(self, message: str) -> None:
         print(f"[service][yume] {message}", flush=True)

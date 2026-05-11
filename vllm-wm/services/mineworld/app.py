@@ -300,8 +300,9 @@ class MineWorldRuntimeService:
         return img_tokens[0:1].contiguous()
 
     def _action_to_token(self, runtime: Runtime, action: Dict[str, Any], session: SessionState) -> torch.Tensor:
-        cam_x = int(round(float(action.get("camera_dx", 0.0)) * 90.0))
-        cam_y = int(round(float(action.get("camera_dy", 0.0)) * 90.0))
+        camera_scale = float(os.getenv("WM_MINEWORLD_CAMERA_SCALE", "15.0"))
+        cam_x = int(round(float(action.get("camera_dx", 0.0)) * camera_scale))
+        cam_y = int(round(float(action.get("camera_dy", 0.0)) * camera_scale))
         cam_x = int(np.clip(cam_x, -90, 90))
         cam_y = int(np.clip(cam_y, -90, 90))
 

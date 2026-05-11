@@ -68,6 +68,15 @@ body {
   flex-wrap: wrap;
 }
 
+#langToggleBtn {
+  min-width: 88px;
+}
+
+#anonymousModeBtn.active {
+  background: var(--accent);
+  color: #fffaf4;
+}
+
 .mode-chip,
 .panel-kicker,
 .meta-pill,
@@ -127,6 +136,11 @@ input[type="file"] {
   background: rgba(255, 255, 255, 0.86);
   color: var(--ink);
   padding: 0 14px;
+}
+
+.side-load-btn {
+  width: 100%;
+  margin-top: 12px;
 }
 
 button {
@@ -264,6 +278,33 @@ button:hover {
   border: 1px solid var(--line);
   background: linear-gradient(180deg, rgba(255, 249, 241, 0.96), rgba(247, 239, 227, 0.96));
   display: block;
+}
+
+.vote-card {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.vote-card.hidden {
+  display: none;
+}
+
+.vote-title {
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.vote-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.vote-btn {
+  background: rgba(255, 255, 255, 0.86);
+  border-color: var(--line);
+  color: var(--ink);
 }
 
 .wasd-cluster {

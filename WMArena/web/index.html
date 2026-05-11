@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -11,46 +11,48 @@
       <header class="hero">
         <div class="hero-copy">
           <div class="mode-chip">WMArena / Side-by-Side</div>
-          <h1>世界模型对战竞技场</h1>
-          <p>选择两个模型，上传同一张初始图，使用一套共享控制器同步驱动左右两侧。</p>
+          <h1 data-i18n="hero_title">World Model Arena</h1>
+          <p data-i18n="hero_desc">Choose two models, upload one shared seed image, and drive each side with its own controller.</p>
         </div>
         <div class="hero-actions">
-          <button id="loadArenaBtn" class="primary-btn">加载双模型</button>
-          <button id="startBattleBtn" class="ghost-btn">开始对战</button>
-          <button id="resetBtn" class="ghost-btn">重置会话</button>
+          <button id="langToggleBtn" class="ghost-btn">中文</button>
+          <button id="anonymousModeBtn" class="ghost-btn" data-i18n="anonymous_mode">Anonymous Mode</button>
+          <button id="resetBtn" class="ghost-btn" data-i18n="reset_session">Reset Session</button>
         </div>
       </header>
 
       <section class="setup-grid">
         <article class="panel selector-panel">
           <div class="panel-kicker">LEFT</div>
-          <label class="field-label" for="leftModelSelect">左侧模型</label>
+          <label class="field-label" for="leftModelSelect" data-i18n="left_model">Left Model</label>
           <select id="leftModelSelect"></select>
-          <p id="leftModelStatus" class="panel-status">未加载</p>
+          <button id="loadLeftBtn" class="primary-btn side-load-btn" data-i18n="load_left">Load Left Side</button>
+          <p id="leftModelStatus" class="panel-status"></p>
         </article>
 
         <article class="panel seed-panel">
           <div class="panel-kicker">COMMON INIT</div>
-          <label class="field-label" for="imageInput">初始图像</label>
+          <label class="field-label" for="imageInput" data-i18n="seed_image">Seed Image</label>
           <input id="imageInput" type="file" accept="image/*" />
           <div class="seed-preview-wrap">
             <img id="seedPreview" alt="Initial seed preview" />
           </div>
-          <p id="battleStatus" class="panel-status">先选择两个模型，再上传初始图像。</p>
+          <p id="battleStatus" class="panel-status"></p>
         </article>
 
         <article class="panel selector-panel">
           <div class="panel-kicker">RIGHT</div>
-          <label class="field-label" for="rightModelSelect">右侧模型</label>
+          <label class="field-label" for="rightModelSelect" data-i18n="right_model">Right Model</label>
           <select id="rightModelSelect"></select>
-          <p id="rightModelStatus" class="panel-status">未加载</p>
+          <button id="loadRightBtn" class="primary-btn side-load-btn" data-i18n="load_right">Load Right Side</button>
+          <p id="rightModelStatus" class="panel-status"></p>
         </article>
       </section>
 
       <main class="arena panel">
         <div class="arena-head">
-          <div class="arena-title">Battle View</div>
-          <div class="arena-note">左右两侧分别发送各自 action JSON，并在两侧都返回后才接受下一次输入。</div>
+          <div class="arena-title" data-i18n="battle_view">Battle View</div>
+          <div class="arena-note" data-i18n="battle_note">Each side sends its own action JSON, and the next input waits until both returns finish.</div>
         </div>
 
         <div class="split-stage">
@@ -63,7 +65,7 @@
               <img id="leftFrameView" alt="Left model frame" />
             </div>
             <div class="controller-card" data-side="left">
-              <div class="controller-title">Left Controller</div>
+              <div class="controller-title" data-i18n="left_controller">Left Controller</div>
               <div class="controller-inline">
                 <div class="wasd-cluster" data-side="left">
                   <button class="key key-w" data-side="left" data-key="w">W</button>
@@ -72,7 +74,7 @@
                   <button class="key key-d" data-side="left" data-key="d">D</button>
                 </div>
                 <div class="camera-panel">
-                  <div class="camera-copy">视角</div>
+                  <div class="camera-copy" data-i18n="camera">Camera</div>
                   <div class="camera-stick" id="leftCameraStick" data-side="left">
                     <div class="camera-ring"></div>
                     <div class="camera-knob" id="leftCameraKnob"></div>
@@ -91,7 +93,7 @@
               <img id="rightFrameView" alt="Right model frame" />
             </div>
             <div class="controller-card" data-side="right">
-              <div class="controller-title">Right Controller</div>
+              <div class="controller-title" data-i18n="right_controller">Right Controller</div>
               <div class="controller-inline">
                 <div class="wasd-cluster" data-side="right">
                   <button class="key key-w" data-side="right" data-key="w">W</button>
@@ -100,7 +102,7 @@
                   <button class="key key-d" data-side="right" data-key="d">D</button>
                 </div>
                 <div class="camera-panel">
-                  <div class="camera-copy">视角</div>
+                  <div class="camera-copy" data-i18n="camera">Camera</div>
                   <div class="camera-stick" id="rightCameraStick" data-side="right">
                     <div class="camera-ring"></div>
                     <div class="camera-knob" id="rightCameraKnob"></div>
@@ -113,16 +115,25 @@
           <div id="startOverlay" class="start-overlay">
             <div class="overlay-card">
               <div class="overlay-eyebrow">Arena Locked</div>
-              <p>加载双模型并上传初始图像后开始对战。</p>
-              <button id="startFloatingBtn" class="primary-btn">开始世界</button>
+              <p data-i18n="overlay_desc">Load both models and upload a shared seed image before starting.</p>
+              <button id="startFloatingBtn" class="primary-btn" data-i18n="enter_world">Enter World</button>
             </div>
           </div>
         </div>
 
         <div class="control-deck">
           <div class="control-copy">
-            <div class="control-title">Dual Controllers</div>
-            <p>左右两套控制器分别映射到对应模型，避免不同动作尺度导致画面逐步漂移。</p>
+            <div class="control-title" data-i18n="dual_controllers">Dual Controllers</div>
+            <p data-i18n="dual_controllers_desc">Each model gets its own controller so mismatched action scales do not drift the scenes apart.</p>
+            <div id="voteCard" class="vote-card hidden">
+              <div class="vote-title" data-i18n="vote_title">Which side do you support?</div>
+              <div class="vote-options">
+                <button class="vote-btn" data-vote="left" data-i18n="vote_left">Support Left</button>
+                <button class="vote-btn" data-vote="right" data-i18n="vote_right">Support Right</button>
+                <button class="vote-btn" data-vote="both" data-i18n="vote_both">Support Both</button>
+                <button class="vote-btn" data-vote="neither" data-i18n="vote_neither">Support Neither</button>
+              </div>
+            </div>
           </div>
         </div>
       </main>

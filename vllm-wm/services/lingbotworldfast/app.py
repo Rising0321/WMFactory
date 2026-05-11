@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import io
+import json
 import os
 import subprocess
 import sys
@@ -33,6 +34,7 @@ LINGBOTFAST_ROOT = Path(
     os.getenv("WM_LINGBOTWORLDFAST_ROOT", str(PROJECT_ROOT / "vendors" / "lingbotworldfast"))
 ).resolve()
 RUNNER_PATH = SERVICE_ROOT / "run_fast_infer.py"
+PERSISTENT_WORKER_PATH = SERVICE_ROOT / "persistent_worker.py"
 
 if str(LINGBOTFAST_ROOT) not in sys.path:
     sys.path.insert(0, str(LINGBOTFAST_ROOT))
@@ -78,7 +80,9 @@ class Runtime:
     session: Optional[SessionState] = None
     num_procs: int = 1
     visible_devices: str = ""
-    mode: str = "torchrun"
+    mode: str = "persistent-torchrun"
+    worker_proc: Optional[subprocess.Popen[str]] = None
+    worker_log_fp: Optional[Any] = None
 
 
 class LingBotWorldFastRuntimeService:
@@ -102,6 +106,17 @@ class LingBotWorldFastRuntimeService:
             )
         ).resolve()
         self.session_root.mkdir(parents=True, exist_ok=True)
+        self.worker_root = Path(
+            os.getenv(
+                "WM_LINGBOTWORLDFAST_WORKER_DIR",
+                str(PROJECT_ROOT / "outputs" / "lingbotworldfast" / "worker"),
+            )
+        ).resolve()
+        self.worker_root.mkdir(parents=True, exist_ok=True)
+        self.worker_request_dir = self.worker_root / "requests"
+        self.worker_request_dir.mkdir(parents=True, exist_ok=True)
+        self.worker_log_path = self.worker_root / "persistent_worker.log"
+        self.worker_ready_path = self.worker_request_dir / "ready.json"
 
         self.service_python = Path(
             os.getenv("WM_LINGBOTWORLDFAST_SERVICE_PYTHON", sys.executable)
@@ -113,9 +128,9 @@ class LingBotWorldFastRuntimeService:
                 "stable geometry, realistic scene persistence, and smooth camera motion."
             ),
         )
-        self.frame_num = pad_frame_num_to_4n_plus_1(int(os.getenv("WM_LINGBOTWORLDFAST_FRAME_NUM", "13")))
+        self.frame_num = pad_frame_num_to_4n_plus_1(int(os.getenv("WM_LINGBOTWORLDFAST_FRAME_NUM", "9")))
         self.size = os.getenv("WM_LINGBOTWORLDFAST_SIZE", "480*832")
-        self.shift = float(os.getenv("WM_LINGBOTWORLDFAST_SHIFT", "3.0"))
+        self.shift = float(os.getenv("WM_LINGBOTWORLDFAST_SHIFT", "10.0"))
         self.seed = int(os.getenv("WM_LINGBOTWORLDFAST_SEED", "42"))
         self.offload_model = self._parse_bool(os.getenv("WM_LINGBOTWORLDFAST_OFFLOAD_MODEL"), default=False)
         self.t5_cpu = self._parse_bool(os.getenv("WM_LINGBOTWORLDFAST_T5_CPU"), default=True)
@@ -125,6 +140,7 @@ class LingBotWorldFastRuntimeService:
         )
         self.max_attention_size = self._parse_optional_int(os.getenv("WM_LINGBOTWORLDFAST_MAX_ATTENTION_SIZE"))
         self.subprocess_timeout = int(os.getenv("WM_LINGBOTWORLDFAST_SUBPROCESS_TIMEOUT", "7200"))
+        self.worker_start_timeout = int(os.getenv("WM_LINGBOTWORLDFAST_WORKER_START_TIMEOUT", "1800"))
 
         self.camera_deadzone = float(os.getenv("WM_LINGBOTWORLDFAST_CAMERA_DEADZONE", "0.08"))
         self.invert_yaw = self._parse_bool(os.getenv("WM_LINGBOTWORLDFAST_INVERT_YAW"), default=False)
@@ -168,7 +184,7 @@ class LingBotWorldFastRuntimeService:
 
     def _resolve_num_procs(self) -> int:
         visible_count = self._visible_cuda_count()
-        default = 2 if visible_count >= 2 else 1
+        default = 4 if visible_count >= 4 else (2 if visible_count >= 2 else 1)
         num_procs = int(os.getenv("WM_LINGBOTWORLDFAST_NUM_PROCS", str(default)))
         if num_procs < 1:
             raise RuntimeError("WM_LINGBOTWORLDFAST_NUM_PROCS must be >= 1")
@@ -185,7 +201,7 @@ class LingBotWorldFastRuntimeService:
             LINGBOTFAST_CHECKPOINT_ROOT / "google" / "umt5-xxl",
             LINGBOTFAST_CHECKPOINT_ROOT / "lingbot_world_fast" / "config.json",
             LINGBOTFAST_CHECKPOINT_ROOT / "lingbot_world_fast" / "diffusion_pytorch_model.safetensors.index.json",
-            RUNNER_PATH,
+            PERSISTENT_WORKER_PATH,
         ]
 
     def health(self) -> Dict[str, Any]:
@@ -208,6 +224,7 @@ class LingBotWorldFastRuntimeService:
 
             self.runtime.num_procs = self._resolve_num_procs()
             self.runtime.visible_devices = self._visible_cuda_devices()
+            self._ensure_worker()
             self.runtime.loaded = True
             self._log(
                 "load done "
@@ -336,42 +353,69 @@ class LingBotWorldFastRuntimeService:
         log_path: Path,
         step_seed: int,
     ) -> None:
-        cmd = [
-            str(self.service_python),
-            "-m",
-            "torch.distributed.run",
-            "--standalone",
-            "--nproc_per_node",
-            str(self.runtime.num_procs),
-            str(RUNNER_PATH),
-            "--ckpt_dir",
-            str(LINGBOTFAST_CHECKPOINT_ROOT),
-            "--image",
-            str(image_path),
-            "--action_path",
-            str(action_path),
-            "--output",
-            str(video_path),
-            "--prompt",
-            self.prompt,
-            "--frame_num",
-            str(self.frame_num),
-            "--size",
-            self.size,
-            "--shift",
-            str(self.shift),
-            "--seed",
-            str(step_seed),
-            "--offload_model",
-            "1" if self.offload_model else "0",
-            "--t5_cpu",
-            "1" if self.t5_cpu else "0",
-            "--convert_model_dtype",
-            "1" if self.convert_model_dtype else "0",
-        ]
-        if self.max_attention_size is not None:
-            cmd.extend(["--max_attention_size", str(self.max_attention_size)])
+        self._ensure_worker()
+        request_id = f"{int(time.time() * 1000)}_{uuid.uuid4().hex}"
+        request_path = self.worker_request_dir / f"request_{request_id}.json"
+        response_path = self.worker_request_dir / f"response_{request_id}.json"
+        payload = {
+            "type": "generate",
+            "request_id": request_id,
+            "image_path": str(image_path),
+            "action_path": str(action_path),
+            "output_path": str(video_path),
+            "prompt": self.prompt,
+            "frame_num": self.frame_num,
+            "size": self.size,
+            "shift": self.shift,
+            "seed": step_seed,
+            "offload_model": self.offload_model,
+            "max_attention_size": self.max_attention_size,
+        }
+        tmp_path = request_path.with_suffix(".tmp")
+        tmp_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+        tmp_path.replace(request_path)
 
+        deadline = time.time() + self.subprocess_timeout
+        while time.time() < deadline:
+            proc = self.runtime.worker_proc
+            if proc is not None and proc.poll() is not None:
+                raise RuntimeError(
+                    f"LingBot-World-Fast persistent worker exited with code {proc.returncode}\n"
+                    f"Worker log tail:\n{self._tail_file(self.worker_log_path)}"
+                )
+            if response_path.exists():
+                response = json.loads(response_path.read_text(encoding="utf-8"))
+                response_path.unlink(missing_ok=True)
+                if not response.get("ok", False):
+                    log_path.write_text(
+                        response.get("traceback") or response.get("error", "unknown worker error"),
+                        encoding="utf-8",
+                    )
+                    raise RuntimeError(
+                        "LingBot-World-Fast persistent worker request failed\n"
+                        f"Worker error: {response.get('error')}\n"
+                        f"Worker log tail:\n{self._tail_file(self.worker_log_path)}"
+                    )
+                break
+            time.sleep(0.5)
+        else:
+            raise TimeoutError(
+                f"Timed out waiting for LingBot-World-Fast persistent worker response {request_id}\n"
+                f"Worker log tail:\n{self._tail_file(self.worker_log_path)}"
+            )
+
+        if not video_path.exists():
+            raise RuntimeError(
+                f"LingBot-World-Fast persistent worker completed but did not produce video: {video_path}\n"
+                f"Worker log tail:\n{self._tail_file(self.worker_log_path)}"
+            )
+
+        log_path.write_text(
+            f"request_id={request_id}\nworker_log={self.worker_log_path}\nvideo_path={video_path}\n",
+            encoding="utf-8",
+        )
+
+    def _build_worker_env(self) -> dict[str, str]:
         env = os.environ.copy()
         env["http_proxy"] = ""
         env["https_proxy"] = ""
@@ -381,29 +425,98 @@ class LingBotWorldFastRuntimeService:
         env["PYTHONUNBUFFERED"] = "1"
         env.setdefault("HF_ENDPOINT", os.getenv("WM_HF_ENDPOINT", "https://hf-mirror.com"))
         env.setdefault("OMP_NUM_THREADS", "1")
+        env.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+        env["PYTHONPATH"] = f"{LINGBOTFAST_ROOT}{os.pathsep}" + env.get("PYTHONPATH", "")
+        return env
 
-        log_path.parent.mkdir(parents=True, exist_ok=True)
-        with log_path.open("w", encoding="utf-8") as log_fp:
-            proc = subprocess.run(
-                cmd,
-                cwd=str(SERVICE_ROOT),
-                env=env,
-                stdout=log_fp,
-                stderr=subprocess.STDOUT,
-                text=True,
-                timeout=self.subprocess_timeout,
+    def _ensure_worker(self) -> None:
+        proc = self.runtime.worker_proc
+        if proc is not None and proc.poll() is None and self.worker_ready_path.exists():
+            return
+
+        if proc is not None and proc.poll() is not None:
+            self._log(f"persistent worker exited code={proc.returncode}, restarting")
+
+        for path in self.worker_request_dir.glob("request_*.json"):
+            path.unlink(missing_ok=True)
+        for path in self.worker_request_dir.glob("response_*.json"):
+            path.unlink(missing_ok=True)
+        self.worker_ready_path.unlink(missing_ok=True)
+
+        cmd = [
+            str(self.service_python),
+            "-m",
+            "torch.distributed.run",
+            "--standalone",
+            "--nproc_per_node",
+            str(self.runtime.num_procs),
+            str(PERSISTENT_WORKER_PATH),
+            "--ckpt_dir",
+            str(LINGBOTFAST_CHECKPOINT_ROOT),
+            "--request_dir",
+            str(self.worker_request_dir),
+        ]
+        if self.runtime.worker_log_fp is not None:
+            try:
+                self.runtime.worker_log_fp.close()
+            except Exception:
+                pass
+        self.worker_log_path.parent.mkdir(parents=True, exist_ok=True)
+        self.runtime.worker_log_fp = self.worker_log_path.open("w", encoding="utf-8")
+        self._log(f"starting persistent torchrun worker: {' '.join(cmd)}")
+        self.runtime.worker_proc = subprocess.Popen(
+            cmd,
+            cwd=str(SERVICE_ROOT),
+            env=self._build_worker_env(),
+            stdout=self.runtime.worker_log_fp,
+            stderr=subprocess.STDOUT,
+            text=True,
+            start_new_session=True,
+        )
+
+        deadline = time.time() + self.worker_start_timeout
+        while time.time() < deadline:
+            proc = self.runtime.worker_proc
+            if proc is not None and proc.poll() is not None:
+                raise RuntimeError(
+                    f"LingBot-World-Fast persistent worker exited during startup code={proc.returncode}\n"
+                    f"Worker log tail:\n{self._tail_file(self.worker_log_path)}"
+                )
+            if self.worker_ready_path.exists():
+                self._log("persistent worker ready")
+                return
+            time.sleep(1.0)
+
+        raise TimeoutError(
+            "Timed out waiting for LingBot-World-Fast persistent worker startup\n"
+            f"Worker log tail:\n{self._tail_file(self.worker_log_path)}"
+        )
+
+    def shutdown(self) -> None:
+        proc = self.runtime.worker_proc
+        if proc is None:
+            return
+        if proc.poll() is None:
+            request_id = f"shutdown_{uuid.uuid4().hex}"
+            request_path = self.worker_request_dir / f"request_{request_id}.json"
+            request_path.write_text(
+                json.dumps({"type": "shutdown", "request_id": request_id}, ensure_ascii=False),
+                encoding="utf-8",
             )
-        if proc.returncode != 0:
-            raise RuntimeError(
-                f"LingBot-World-Fast runner exited with code {proc.returncode}\n"
-                f"Command: {' '.join(cmd)}\n"
-                f"Runner log tail:\n{self._tail_file(log_path)}"
-            )
-        if not video_path.exists():
-            raise RuntimeError(
-                f"LingBot-World-Fast runner completed but did not produce video: {video_path}\n"
-                f"Runner log tail:\n{self._tail_file(log_path)}"
-            )
+            try:
+                proc.wait(timeout=30)
+            except subprocess.TimeoutExpired:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+        if self.runtime.worker_log_fp is not None:
+            try:
+                self.runtime.worker_log_fp.close()
+            except Exception:
+                pass
+            self.runtime.worker_log_fp = None
 
     def _tail_file(self, path: Path, lines: int = 120) -> str:
         try:
@@ -479,6 +592,11 @@ class LingBotWorldFastRuntimeService:
 
 svc = LingBotWorldFastRuntimeService()
 app = FastAPI(title="WMFactory LingBot-World-Fast Service")
+
+
+@app.on_event("shutdown")
+def shutdown() -> None:
+    svc.shutdown()
 
 
 @app.post("/health")

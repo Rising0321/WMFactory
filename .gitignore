@@ -73,43 +73,43 @@ Thumbs.db
 *.ply
 
 # Model-local heavy artifacts
-models/**/checkpoints/
-models/**/weights/
-models/**/pretrained/
-models/**/outputs/
-models/**/outputs_*/
-models/**/output/
-models/**/results/
-models/**/results_*/
-models/**/logs/
-models/**/runs/
-models/**/.gradio/
+_models_legacy/**/checkpoints/
+_models_legacy/**/weights/
+_models_legacy/**/pretrained/
+_models_legacy/**/outputs/
+_models_legacy/**/outputs_*/
+_models_legacy/**/output/
+_models_legacy/**/results/
+_models_legacy/**/results_*/
+_models_legacy/**/logs/
+_models_legacy/**/runs/
+_models_legacy/**/.gradio/
 
 # Large demo / showcase assets
-/models/Matrix-Game/Matrix-Game-2/assets/pdf/
-/models/Matrix-Game/Matrix-Game-2/demo_images/
-/models/Matrix-Game/Matrix-Game-1/assets/videos/
-/models/Matrix-Game-3.0/README.md
-/models/Matrix-Game-3.0/assets/
-/models/Matrix-Game-3.0/demo_images/
-/models/Matrix-Game-3.0/output/
-/models/Matrix-Game-3.0/Matrix-Game-3.0/
-/models/Matrix-Game-3.0/test.sh
-/models/Vid2World/assets/long_rollout/
-/models/Vid2World/assets/v2w_overview.png
-/models/Hunyuan-GameCraft-1.0/asset/teaser.png
-/models/lingbot-world/LingBot_World_paper.pdf
-/models/worldfm/submodules/HunyuanWorld-1.0/assets/panorama1.gif
-/models/worldfm/submodules/HunyuanWorld-1.0/assets/panorama2.gif
-/models/worldfm/submodules/HunyuanWorld-1.0/assets/quick_look.gif
-/models/worldfm/submodules/HunyuanWorld-1.0/assets/roaming_world.gif
-/models/worldfm/submodules/HunyuanWorld-1.0/assets/application.png
+/models_legacy/Matrix-Game/Matrix-Game-2/assets/pdf/
+/models_legacy/Matrix-Game/Matrix-Game-2/demo_images/
+/models_legacy/Matrix-Game/Matrix-Game-1/assets/videos/
+/models_legacy/Matrix-Game-3.0/README.md
+/models_legacy/Matrix-Game-3.0/assets/
+/models_legacy/Matrix-Game-3.0/demo_images/
+/models_legacy/Matrix-Game-3.0/output/
+/models_legacy/Matrix-Game-3.0/Matrix-Game-3.0/
+/models_legacy/Matrix-Game-3.0/test.sh
+/models_legacy/Vid2World/assets/long_rollout/
+/models_legacy/Vid2World/assets/v2w_overview.png
+/models_legacy/Hunyuan-GameCraft-1.0/asset/teaser.png
+/models_legacy/lingbot-world/LingBot_World_paper.pdf
+/models_legacy/worldfm/submodules/HunyuanWorld-1.0/assets/panorama1.gif
+/models_legacy/worldfm/submodules/HunyuanWorld-1.0/assets/panorama2.gif
+/models_legacy/worldfm/submodules/HunyuanWorld-1.0/assets/quick_look.gif
+/models_legacy/worldfm/submodules/HunyuanWorld-1.0/assets/roaming_world.gif
+/models_legacy/worldfm/submodules/HunyuanWorld-1.0/assets/application.png
 
 # Known model-local datasets / caches that are not source code
-/models/solaris/datasets/
-/models/Matrix-Game/Matrix-Game-1/GameWorldScore/GameWorld/third_party/amt/datasets/
-/models/Matrix-Game/Matrix-Game-1/GameWorldScore/GameWorld/third_party/umt/datasets/
-/models/Infinite-World/.cache/
+/models_legacy/solaris/datasets/
+/models_legacy/Matrix-Game/Matrix-Game-1/GameWorldScore/GameWorld/third_party/amt/datasets/
+/models_legacy/Matrix-Game/Matrix-Game-1/GameWorldScore/GameWorld/third_party/umt/datasets/
+/models_legacy/Infinite-World/.cache/
 
 # Frontend package artifacts if introduced later
 node_modules/

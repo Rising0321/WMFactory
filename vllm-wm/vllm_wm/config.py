@@ -39,6 +39,9 @@ class EngineConfig:
         candidates = [
             self.unified_python,
             self.project_root / ".venv" / "Scripts" / "python.exe",
+            # Repo-level venv (e.g. WMFactory/venvs/vllm-wm) next to the vllm-wm package tree
+            self.project_root.parent / "venvs" / "vllm-wm" / "bin" / "python",
+            self.project_root.parent / "venvs" / "vllm-wm" / "Scripts" / "python.exe",
             self.project_root / "venvs" / "vllm-wm" / "bin" / "python",
             self.project_root / "venvs" / "vllm-wm" / "Scripts" / "python.exe",
         ]

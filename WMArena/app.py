@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 import os
+import random
 import subprocess
 import sys
 import threading
+from datetime import datetime, timezone
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Optional, Type
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -25,6 +27,7 @@ if str(FRONTEND_ROOT) not in sys.path:
     sys.path.insert(0, str(FRONTEND_ROOT))
 
 import server as shared_gateway
+from db import init_db, insert_vote
 from adapters import (
     DiamondAdapter,
     GameCraftAdapter,
@@ -78,8 +81,17 @@ ENV_LOCK = threading.Lock()
 
 
 class ArenaLoadRequest(BaseModel):
-    left_model_id: str
-    right_model_id: str
+    left_model_id: Optional[str] = None
+    right_model_id: Optional[str] = None
+    anonymous_mode: bool = False
+    client_id: Optional[str] = None
+
+
+class ArenaSideLoadRequest(BaseModel):
+    side: str
+    model_id: Optional[str] = None
+    anonymous_mode: bool = False
+    client_id: Optional[str] = None
 
 
 class ArenaStartRequest(BaseModel):
@@ -93,6 +105,11 @@ class ArenaStepRequest(BaseModel):
 
 class ArenaResetRequest(BaseModel):
     init_image_base64: Optional[str] = None
+
+
+class ArenaVoteRequest(BaseModel):
+    vote_option: str
+    client_id: Optional[str] = None
 
 
 @dataclass
@@ -115,9 +132,16 @@ class ArenaState:
     left: SideState = field(default_factory=lambda: SideState("left"))
     right: SideState = field(default_factory=lambda: SideState("right"))
     init_image_base64: Optional[str] = None
+    round_id: Optional[str] = None
+    anonymous_mode: bool = False
+    anonymous_revealed: bool = False
+    client_id: Optional[str] = None
+    left_gpu_devices: Optional[tuple[int, ...]] = None
+    right_gpu_devices: Optional[tuple[int, ...]] = None
 
 
 state = ArenaState()
+init_db()
 app = FastAPI(title="WMArena")
 app.add_middleware(
     CORSMiddleware,
@@ -149,6 +173,32 @@ def _require_model(model_id: str) -> ModelConfig:
     if cfg is None:
         raise HTTPException(status_code=404, detail=f"Unsupported model '{model_id}'")
     return cfg
+
+
+def _model_catalog() -> list[Dict[str, Any]]:
+    return list(shared_gateway.list_models()["models"])
+
+
+def _pick_random_models() -> tuple[str, str]:
+    model_ids = [str(item["id"]) for item in _model_catalog()]
+    if len(model_ids) < 2:
+        raise HTTPException(status_code=400, detail="Need at least 2 models for anonymous arena")
+    left_model_id, right_model_id = random.sample(model_ids, 2)
+    return left_model_id, right_model_id
+
+
+def _new_round_id() -> str:
+    return f"arena-{random.getrandbits(64):016x}"
+
+
+def _clear_round_state() -> None:
+    state.init_image_base64 = None
+    state.round_id = None
+    state.anonymous_revealed = False
+    state.left.session_id = None
+    state.right.session_id = None
+    state.left.last_frame_base64 = None
+    state.right.last_frame_base64 = None
 
 
 def _split_idle_gpu_groups() -> tuple[list[int], list[int]]:
@@ -214,6 +264,48 @@ def _build_side_env(model_id: str, side: str, visible_devices: list[int]) -> Dic
     return env
 
 
+def _side_payload(side_state: SideState) -> Dict[str, Any]:
+    return {
+        "model_id": side_state.model_id,
+        "gpu_index": side_state.gpu_index,
+        "visible_devices": side_state.visible_devices,
+        "port": side_state.port,
+        "device": side_state.device,
+        "status": "loaded" if side_state.loaded else "not_loaded",
+        "loaded": side_state.loaded,
+    }
+
+
+def _ensure_gpu_allocations() -> None:
+    if state.left_gpu_devices is not None and state.right_gpu_devices is not None:
+        return
+    left_gpus, right_gpus = _split_idle_gpu_groups()
+    state.left_gpu_devices = tuple(left_gpus)
+    state.right_gpu_devices = tuple(right_gpus)
+
+
+def _ensure_model_pair(req: ArenaSideLoadRequest) -> None:
+    if req.anonymous_mode:
+        if not state.left.model_id and not state.right.model_id:
+            left_model_id, right_model_id = _pick_random_models()
+            state.left.model_id = left_model_id
+            state.right.model_id = right_model_id
+        elif not state.left.model_id or not state.right.model_id:
+            raise HTTPException(status_code=400, detail="Anonymous pair is incomplete; reset and reload")
+        return
+    else:
+        if not req.model_id:
+            raise HTTPException(status_code=400, detail="model_id is required when anonymous mode is off")
+        if req.side == "left":
+            if state.right.model_id and req.model_id == state.right.model_id:
+                raise HTTPException(status_code=400, detail="Left and right models must be different in phase 1")
+            state.left.model_id = req.model_id
+        else:
+            if state.left.model_id and req.model_id == state.left.model_id:
+                raise HTTPException(status_code=400, detail="Left and right models must be different in phase 1")
+            state.right.model_id = req.model_id
+
+
 def _call_with_side_env(side_state: SideState, method_name: str, *args: Any) -> Any:
     if side_state.adapter is None:
         raise HTTPException(status_code=400, detail=f"{side_state.side} side is not loaded")
@@ -245,6 +337,32 @@ def _load_side(side_state: SideState) -> Dict[str, Any]:
     side_state.loaded = True
     side_state.device = str(data.get("device", f"cuda:{side_state.gpu_index}"))
     return data
+
+
+def _load_requested_side(side: str) -> Dict[str, Any]:
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    if side == "left":
+        if state.left.model_id is None:
+            raise HTTPException(status_code=400, detail="Left model is not set")
+        visible_devices = list(state.left_gpu_devices or ())
+        if not visible_devices:
+            raise HTTPException(status_code=400, detail="Left GPU group is not allocated")
+        left_state = _make_side_state("left", state.left.model_id, visible_devices)
+        load_result = _load_side(left_state)
+        state.left = left_state
+        state.left.device = str(load_result.get("device", f"cuda:{state.left.gpu_index}"))
+        return load_result
+
+    if state.right.model_id is None:
+        raise HTTPException(status_code=400, detail="Right model is not set")
+    visible_devices = list(state.right_gpu_devices or ())
+    if not visible_devices:
+        raise HTTPException(status_code=400, detail="Right GPU group is not allocated")
+    right_state = _make_side_state("right", state.right.model_id, visible_devices)
+    load_result = _load_side(right_state)
+    state.right = right_state
+    state.right.device = str(load_result.get("device", f"cuda:{state.right.gpu_index}"))
+    return load_result
 
 
 def _start_side(side_state: SideState, init_image_bytes: bytes) -> Dict[str, Any]:
@@ -291,14 +409,21 @@ def random_dataset_image(req: shared_gateway.RandomDatasetImageRequest) -> Dict[
 
 @app.post("/api/arena/load")
 def arena_load(req: ArenaLoadRequest) -> Dict[str, Any]:
-    if req.left_model_id == req.right_model_id:
+    if req.anonymous_mode:
+        left_model_id, right_model_id = _pick_random_models()
+    else:
+        if not req.left_model_id or not req.right_model_id:
+            raise HTTPException(status_code=400, detail="left_model_id and right_model_id are required")
+        left_model_id, right_model_id = req.left_model_id, req.right_model_id
+
+    if left_model_id == right_model_id:
         raise HTTPException(status_code=400, detail="Left and right models must be different in phase 1")
 
     left_gpus, right_gpus = _split_idle_gpu_groups()
     LOG_DIR.mkdir(parents=True, exist_ok=True)
 
-    left_state = _make_side_state("left", req.left_model_id, left_gpus)
-    right_state = _make_side_state("right", req.right_model_id, right_gpus)
+    left_state = _make_side_state("left", left_model_id, left_gpus)
+    right_state = _make_side_state("right", right_model_id, right_gpus)
 
     try:
         left_result = _load_side(left_state)
@@ -308,24 +433,54 @@ def arena_load(req: ArenaLoadRequest) -> Dict[str, Any]:
 
     state.left = left_state
     state.right = right_state
+    state.left_gpu_devices = tuple(left_gpus)
+    state.right_gpu_devices = tuple(right_gpus)
     state.init_image_base64 = None
+    state.round_id = None
+    state.anonymous_mode = bool(req.anonymous_mode)
+    state.anonymous_revealed = False
+    state.client_id = req.client_id
     return {
-        "left": {
-            "model_id": req.left_model_id,
-            "gpu_index": left_state.gpu_index,
-            "visible_devices": left_state.visible_devices,
-            "port": left_state.port,
-            "device": left_result.get("device", "cuda:0"),
-            "status": left_result.get("status", "loaded"),
-        },
-        "right": {
-            "model_id": req.right_model_id,
-            "gpu_index": right_state.gpu_index,
-            "visible_devices": right_state.visible_devices,
-            "port": right_state.port,
-            "device": right_result.get("device", "cuda:0"),
-            "status": right_result.get("status", "loaded"),
-        },
+        "anonymous_mode": state.anonymous_mode,
+        "anonymous_revealed": state.anonymous_revealed,
+        "left": _side_payload(state.left),
+        "right": _side_payload(state.right),
+    }
+
+
+@app.post("/api/arena/load-side")
+def arena_load_side(req: ArenaSideLoadRequest) -> Dict[str, Any]:
+    side = str(req.side).strip().lower()
+    if side not in {"left", "right"}:
+        raise HTTPException(status_code=400, detail="side must be 'left' or 'right'")
+
+    if req.anonymous_mode != state.anonymous_mode:
+        state.left = SideState("left")
+        state.right = SideState("right")
+        state.left_gpu_devices = None
+        state.right_gpu_devices = None
+
+    state.anonymous_mode = bool(req.anonymous_mode)
+    state.client_id = req.client_id
+
+    _ensure_model_pair(req)
+
+    if state.left.model_id and state.right.model_id and state.left.model_id == state.right.model_id:
+        raise HTTPException(status_code=400, detail="Left and right models must be different in phase 1")
+
+    _ensure_gpu_allocations()
+    _clear_round_state()
+
+    try:
+        _load_requested_side(side)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    return {
+        "anonymous_mode": state.anonymous_mode,
+        "anonymous_revealed": state.anonymous_revealed,
+        "left": _side_payload(state.left),
+        "right": _side_payload(state.right),
     }
 
 
@@ -345,7 +500,14 @@ def arena_start(req: ArenaStartRequest) -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     state.init_image_base64 = req.init_image_base64
-    return {"left": left_result, "right": right_result}
+    state.round_id = _new_round_id()
+    return {
+        "round_id": state.round_id,
+        "anonymous_mode": state.anonymous_mode,
+        "anonymous_revealed": state.anonymous_revealed,
+        "left": left_result,
+        "right": right_result,
+    }
 
 
 @app.post("/api/arena/reset")
@@ -364,7 +526,14 @@ def arena_reset(req: ArenaResetRequest) -> Dict[str, Any]:
 
     if payload:
         state.init_image_base64 = payload
-    return {"left": left_result, "right": right_result}
+    state.round_id = _new_round_id()
+    return {
+        "round_id": state.round_id,
+        "anonymous_mode": state.anonymous_mode,
+        "anonymous_revealed": state.anonymous_revealed,
+        "left": left_result,
+        "right": right_result,
+    }
 
 
 @app.post("/api/arena/step")
@@ -379,6 +548,52 @@ def arena_step(req: ArenaStepRequest) -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     return {"left": left_result, "right": right_result}
+
+
+@app.post("/api/arena/vote")
+def arena_vote(req: ArenaVoteRequest, request: Request) -> Dict[str, Any]:
+    if state.left.model_id is None or state.right.model_id is None:
+        raise HTTPException(status_code=400, detail="No loaded arena models")
+    if state.round_id is None:
+        raise HTTPException(status_code=400, detail="No active arena round")
+
+    vote_option = str(req.vote_option).strip().lower()
+    if vote_option not in {"left", "right", "both", "neither"}:
+        raise HTTPException(status_code=400, detail="Unsupported vote option")
+
+    record_id = insert_vote(
+        {
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "arena_round_id": state.round_id,
+            "client_id": req.client_id or state.client_id,
+            "client_ip": None if request.client is None else request.client.host,
+            "user_agent": request.headers.get("user-agent", ""),
+            "vote_option": vote_option,
+            "anonymous_mode": state.anonymous_mode,
+            "left_model_id": state.left.model_id,
+            "right_model_id": state.right.model_id,
+            "left_session_id": state.left.session_id,
+            "right_session_id": state.right.session_id,
+            "left_visible_devices": state.left.visible_devices,
+            "right_visible_devices": state.right.visible_devices,
+            "extra": {
+                "left_device": state.left.device,
+                "right_device": state.right.device,
+                "left_port": state.left.port,
+                "right_port": state.right.port,
+            },
+        }
+    )
+    state.anonymous_revealed = True
+    return {
+        "vote_id": record_id,
+        "vote_option": vote_option,
+        "anonymous_mode": state.anonymous_mode,
+        "anonymous_revealed": state.anonymous_revealed,
+        "round_id": state.round_id,
+        "left": {"model_id": state.left.model_id},
+        "right": {"model_id": state.right.model_id},
+    }
 
 
 @app.get("/")

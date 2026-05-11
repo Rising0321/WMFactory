@@ -332,10 +332,8 @@ class WhamRuntimeService:
         # Left stick from WASD.
         left_x = (1.0 if bool(action.get("d", False)) else 0.0) - (1.0 if bool(action.get("a", False)) else 0.0)
         left_y = (1.0 if bool(action.get("w", False)) else 0.0) - (1.0 if bool(action.get("s", False)) else 0.0)
-        # Frontend already applies the unified camera inversion policy.
-        # WHAM needs the opposite sign convention on both right-stick axes.
-        right_x = -float(action.get("camera_dx", 0.0) or 0.0)
-        right_y = float(action.get("camera_dy", 0.0) or 0.0)
+        right_x = float(action.get("camera_dx", 0.0) or 0.0)
+        right_y = -float(action.get("camera_dy", 0.0) or 0.0)
 
         out[12] = float(np.clip(left_x, -1.0, 1.0))
         out[13] = float(np.clip(left_y, -1.0, 1.0))

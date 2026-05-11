@@ -38,7 +38,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--prompt", required=True)
     parser.add_argument("--frame_num", type=int, default=13)
     parser.add_argument("--size", type=str, default="480*832")
-    parser.add_argument("--shift", type=float, default=3.0)
+    parser.add_argument("--shift", type=float, default=10.0)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--offload_model", type=_str2bool, default=False)
     parser.add_argument("--t5_cpu", type=_str2bool, default=False)

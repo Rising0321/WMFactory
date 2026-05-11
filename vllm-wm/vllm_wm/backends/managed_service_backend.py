@@ -146,7 +146,11 @@ class ManagedServiceBackend(BaseWorldModelBackend):
         configured = os.getenv(self._key("URL"))
         if configured:
             return configured.rstrip("/")
-        return f"http://127.0.0.1:{self.spec.default_port}"
+        host = os.getenv(self._key("HOST"), "127.0.0.1")
+        port_env = os.getenv(self._key("PORT"))
+        if port_env:
+            return f"http://{host}:{int(port_env)}"
+        return f"http://{host}:{self.spec.default_port}"
 
     def _tail_service_log(self, lines: int = 80) -> str:
         try:

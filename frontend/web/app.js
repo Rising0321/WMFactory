@@ -347,7 +347,7 @@ function clamp(value, min, max) {
 
 function cameraInversionForModel() {
   if (state.modelId === "diamond") {
-    return { invertX: false, invertY: false };
+    return { invertX: true, invertY: true };
   }
   if (state.modelId === "matrixgame") {
     return { invertX: false, invertY: false };

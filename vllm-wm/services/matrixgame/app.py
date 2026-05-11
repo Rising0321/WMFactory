@@ -91,6 +91,20 @@ class MatrixGameRuntimeService:
 
         self.runtime: Optional[Runtime] = None
 
+    @staticmethod
+    def _action_bool(action: Dict[str, Any], key: str) -> bool:
+        """Robust key-down parsing (avoids truthy strings like \"false\")."""
+        v = action.get(key)
+        if v is True:
+            return True
+        if v is False or v is None:
+            return False
+        if isinstance(v, (int, float)):
+            return v != 0
+        if isinstance(v, str):
+            return v.strip().lower() in ("1", "true", "yes", "y", "on")
+        return bool(v)
+
     def load(self) -> Dict[str, Any]:
         self._log("load requested")
         if self.runtime is not None:
@@ -446,14 +460,16 @@ class MatrixGameRuntimeService:
     def _map_action(self, runtime: Runtime, action: Dict[str, Any]) -> Dict[str, torch.Tensor]:
         mode = runtime.mode
         if mode == "universal":
+            # Must match MatrixGame2 interactive mapping in pipeline/causal_inference.py KEYBOARD_IDX:
+            # w=[1,0,0,0], s=[0,1,0,0], a=[0,0,1,0], d=[0,0,0,1], q=[0,0,0,0]
             keyboard = torch.zeros(4, device=runtime.device, dtype=runtime.weight_dtype)
-            if bool(action.get("w")):
+            if self._action_bool(action, "w"):
                 keyboard[0] = 1
-            if bool(action.get("s")):
+            if self._action_bool(action, "s"):
                 keyboard[1] = 1
-            if bool(action.get("a")):
+            if self._action_bool(action, "a"):
                 keyboard[2] = 1
-            if bool(action.get("d")):
+            if self._action_bool(action, "d"):
                 keyboard[3] = 1
 
             dx = float(action.get("camera_dx", 0.0) or 0.0)
@@ -469,15 +485,15 @@ class MatrixGameRuntimeService:
 
         if mode == "gta_drive":
             keyboard = torch.zeros(2, device=runtime.device, dtype=runtime.weight_dtype)
-            if bool(action.get("w")):
+            if self._action_bool(action, "w"):
                 keyboard[0] = 1
-            if bool(action.get("s")):
+            if self._action_bool(action, "s"):
                 keyboard[1] = 1
 
             steer_from_keys = 0.0
-            if bool(action.get("a")):
+            if self._action_bool(action, "a"):
                 steer_from_keys -= 1.0
-            if bool(action.get("d")):
+            if self._action_bool(action, "d"):
                 steer_from_keys += 1.0
             steer = steer_from_keys + float(action.get("camera_dx", 0.0) or 0.0)
             steer = max(-1.0, min(1.0, steer))
@@ -485,13 +501,13 @@ class MatrixGameRuntimeService:
             return {"keyboard": keyboard, "mouse": mouse}
 
         keyboard = torch.zeros(7, device=runtime.device, dtype=runtime.weight_dtype)
-        if bool(action.get("w")):
+        if self._action_bool(action, "w"):
             keyboard[1] = 1  # jump
-        elif bool(action.get("s")):
+        elif self._action_bool(action, "s"):
             keyboard[2] = 1  # slide
-        elif bool(action.get("a")):
+        elif self._action_bool(action, "a"):
             keyboard[5] = 1  # leftside
-        elif bool(action.get("d")):
+        elif self._action_bool(action, "d"):
             keyboard[6] = 1  # rightside
         else:
             keyboard[0] = 1  # nomove

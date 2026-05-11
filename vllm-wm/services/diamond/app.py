@@ -68,6 +68,9 @@ class Runtime:
 class DiamondRuntimeService:
     def __init__(self) -> None:
         self.runtime: Optional[Runtime] = None
+        self.mouse_gain_x = float(os.getenv("WM_DIAMOND_MOUSE_GAIN_X", "300.0"))
+        self.mouse_gain_y = float(os.getenv("WM_DIAMOND_MOUSE_GAIN_Y", "120.0"))
+        self.movement_step_repeat = max(1, int(os.getenv("WM_DIAMOND_MOVEMENT_STEP_REPEAT", "3")))
 
     def load(self) -> Dict[str, Any]:
         print("[service] load requested", flush=True)
@@ -155,7 +158,14 @@ class DiamondRuntimeService:
         self._require_session(runtime, session_id)
 
         act_vec = self._encode_action_vector(action, runtime.device)
-        next_obs, rew, end, trunc, info = runtime.wm_env.step(act_vec)
+        n_step = (
+            self.movement_step_repeat
+            if self._movement_only_repeatable(action)
+            else 1
+        )
+        next_obs = rew = end = trunc = info = None
+        for _ in range(n_step):
+            next_obs, rew, end, trunc, info = runtime.wm_env.step(act_vec)
 
         return {
             "session_id": session_id,
@@ -344,8 +354,7 @@ class DiamondRuntimeService:
         l_click = torch.tensor([1.0 if action.get("l_click") else 0.0], device=device)
         r_click = torch.tensor([1.0 if action.get("r_click") else 0.0], device=device)
 
-        raw_x = -float(action.get("camera_dx", 0.0)) * 300.0
-        raw_y = -float(action.get("camera_dy", 0.0)) * 120.0
+        raw_x, raw_y = self._mouse_raw_from_unified(action)
         mx = min(MOUSE_X_POSSIBLES, key=lambda v: abs(v - raw_x))
         my = min(MOUSE_Y_POSSIBLES, key=lambda v: abs(v - raw_y))
 
@@ -355,6 +364,26 @@ class DiamondRuntimeService:
         mouse_y[MOUSE_Y_POSSIBLES.index(my)] = 1
 
         return torch.cat([keys, l_click, r_click, mouse_x, mouse_y], dim=0)
+
+    def _movement_only_repeatable(self, action: Dict[str, Any]) -> bool:
+        """Repeat env steps only for pure WASD (no look). Camera / mouse deltas stay single-step."""
+        dx = float(action.get("camera_dx", 0.0) or 0.0)
+        dy = float(action.get("camera_dy", 0.0) or 0.0)
+        if abs(dx) > 1e-6 or abs(dy) > 1e-6:
+            return False
+        return bool(
+            action.get("w")
+            or action.get("a")
+            or action.get("s")
+            or action.get("d")
+        )
+
+    def _mouse_raw_from_unified(self, action: Dict[str, Any]) -> Tuple[float, float]:
+        # Match unified sweep: cu/cd/cl/cr map to camera_dy / camera_dx.
+        # Previous sign flipped pitch and yaw vs user expectation.
+        raw_x = float(action.get("camera_dx", 0.0) or 0.0) * self.mouse_gain_x
+        raw_y = float(action.get("camera_dy", 0.0) or 0.0) * self.mouse_gain_y
+        return raw_x, raw_y
 
 
 svc = DiamondRuntimeService()

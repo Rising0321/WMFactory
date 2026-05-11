@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import base64
 import io
 import json
@@ -14,7 +15,7 @@ from typing import Any
 
 from PIL import Image
 
-from vllm_wm.registry import build_backend
+from vllm_wm.registry import build_backend, get_model_spec
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -64,7 +65,8 @@ MODEL_ENVS = {
     "wham": {},
     "vid2world": {
         "WM_VID2WORLD_DATA_DIR": str(PROJECT_ROOT / "data" / "csgo_processed_min" / "full_res"),
-        "WM_VID2WORLD_DDIM_STEPS": "8",
+        "WM_VID2WORLD_DDIM_STEPS": "50",
+        "WM_VID2WORLD_TIMESTEP_SPACING": "uniform_trailing",
     },
     "infinite-world": {
         "WM_INFINITEWORLD_WARMUP_ON_START": "0",
@@ -94,9 +96,10 @@ MODEL_ENVS = {
         "WM_LINGBOTWORLDFAST_STEP_TIMEOUT": "1800",
         "WM_LINGBOTWORLDFAST_SIZE": "480*832",
         "WM_LINGBOTWORLDFAST_FRAME_NUM": "9",
-        "WM_LINGBOTWORLDFAST_SHIFT": "3.0",
-        "WM_LINGBOTWORLDFAST_T5_CPU": "1",
-        "WM_LINGBOTWORLDFAST_OFFLOAD_MODEL": "1",
+        "WM_LINGBOTWORLDFAST_SHIFT": "10.0",
+        "WM_LINGBOTWORLDFAST_NUM_PROCS": "4",
+        "WM_LINGBOTWORLDFAST_T5_CPU": "0",
+        "WM_LINGBOTWORLDFAST_OFFLOAD_MODEL": "0",
     },
 }
 
@@ -162,6 +165,7 @@ def verify_model(model_id: str) -> dict[str, Any]:
     image_type = MODEL_IMAGE_TYPE[model_id]
     image_path = DEMO_IMAGES[image_type]
     image_payload = encode_image(image_path)
+    seed_meta: dict[str, Any] | None = None
 
     backend = None
     started_at = time.perf_counter()
@@ -175,8 +179,15 @@ def verify_model(model_id: str) -> dict[str, Any]:
             load_payload = backend.load()
             timings["load_s"] = round(time.perf_counter() - t0, 3)
 
+            spec = get_model_spec(model_id)
+            if spec.supports_seed_meta and spec.supports_random_dataset and spec.default_dataset_ids:
+                dataset_payload = backend.random_dataset_image(spec.default_dataset_ids[0])
+                image_payload = dataset_payload["image_base64"]
+                seed_meta = dataset_payload.get("extra", {}).get("seed_meta")
+                image_path = Path(str(seed_meta["file"])) if seed_meta is not None and "file" in seed_meta else image_path
+
             t0 = time.perf_counter()
-            start_payload = backend.start_session(image_payload)
+            start_payload = backend.start_session(image_payload, seed_meta=seed_meta)
             timings["start_s"] = round(time.perf_counter() - t0, 3)
 
             start_image = decode_frame(start_payload["frame_base64"])
@@ -247,17 +258,34 @@ def verify_model(model_id: str) -> dict[str, Any]:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description="End-to-end rollout verification for vllm-wm models.")
+    parser.add_argument(
+        "--models",
+        nargs="+",
+        metavar="MODEL_ID",
+        help="If set, only run these model ids (must be keys in MODEL_IMAGE_TYPE).",
+    )
+    args = parser.parse_args()
+    model_ids = list(MODEL_IMAGE_TYPE)
+    if args.models:
+        unknown = [m for m in args.models if m not in MODEL_IMAGE_TYPE]
+        if unknown:
+            raise SystemExit(f"Unknown model id(s): {unknown}. Valid: {list(MODEL_IMAGE_TYPE)}")
+        model_ids = list(args.models)
+
     OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
     results = []
-    for model_id in MODEL_IMAGE_TYPE:
+    for model_id in model_ids:
         print(f"=== verify {model_id} ===", flush=True)
         print("gpu_before", gpu_state(), flush=True)
         result = verify_model(model_id)
         results.append(result)
         print(json.dumps(result, ensure_ascii=False, indent=2), flush=True)
 
-    save_json(OUTPUT_ROOT / "summary.json", results)
-    print("summary_path", OUTPUT_ROOT / "summary.json", flush=True)
+    out_name = "summary.json" if not args.models else f"summary_{'_'.join(args.models)}.json"
+    summary_path = OUTPUT_ROOT / out_name
+    save_json(summary_path, results)
+    print("summary_path", summary_path, flush=True)
 
 
 if __name__ == "__main__":
