@@ -1,12 +1,13 @@
 # Canonical runtime environment for WMBackend.
 # This is the single source of truth for the shared backend environment.
-# `flash-attn` is required and must be installed successfully by the user.
+# `flash-attn` may compile from source; requires a CUDA toolchain matching PyTorch.
 
 --extra-index-url https://download.pytorch.org/whl/cu128
 
 torch==2.9.0
 torchvision==0.24.0
 torchaudio==2.9.0
+flash-attn==2.8.3
 accelerate>=1.13.0
 ale-py>=0.11.2
 decord==0.6.0
@@ -40,3 +41,22 @@ torcheval>=0.0.7
 transformers==4.57.3
 uvicorn>=0.30.0
 wandb>=0.19.11
+
+scipy==1.17.1
+datasets==4.6.1
+openai==2.24.0
+tiktoken==0.12.0
+jsonschema==4.26.0
+
+peft==0.19.1
+kornia==0.8.2
+polars==1.38.1
+litellm==1.82.0
+rich==15.0.0
+typer==0.24.1
+trimesh==4.12.2
+
+virtualenv==21.1.0
+wheel==0.47.0
+remote-pdb==2.1.0
+python-discovery==1.1.0
