@@ -47,9 +47,8 @@ Thumbs.db
 *.err
 *.tmp
 *.temp
-/WMArena/*.sqlite3
-/WMArena/logs/
-/WMArena/__pycache__/
+# WMArena: keep locally, do not push (entire tree ignored)
+/WMArena/
 /frontend/__pycache__/
 
 # Large generated media / arrays
