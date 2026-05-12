@@ -13,7 +13,7 @@ from urllib.parse import urlparse
 import httpx
 
 from .base import StepResult, WorldModelAdapter
-from .runtime_utils import configure_subprocess_cuda
+from .runtime_utils import configure_subprocess_cuda, default_service_workdir
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -40,7 +40,7 @@ class DiamondAdapter(WorldModelAdapter):
 
         self.service_host = os.getenv("WM_DIAMOND_HOST", parsed.hostname or "127.0.0.1")
         self.service_port = int(os.getenv("WM_DIAMOND_PORT", str(parsed.port or 9001)))
-        self.service_dir = Path(os.getenv("WM_DIAMOND_SERVICE_DIR", str(ROOT / "services" / "diamond")))
+        self.service_dir = Path(os.getenv("WM_DIAMOND_SERVICE_DIR", str(default_service_workdir("diamond"))))
         self.service_python = os.getenv("WM_DIAMOND_PYTHON", str(ROOT / "venvs" / "diamond" / "bin" / "python"))
         self.service_log = Path(os.getenv("WM_DIAMOND_LOG", str(self.service_dir / "diamond_service.log")))
         self.step_log_every = int(os.getenv("WM_DIAMOND_STEP_LOG_EVERY", "20"))

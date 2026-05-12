@@ -14,25 +14,14 @@ const state = {
     l_click: false,
     r_click: false,
   },
-  mineworldCameraActive: false,
-  mineworldCameraPointerId: null,
-  mineworldCameraLastX: 0,
-  mineworldCameraLastY: 0,
+  cameraHeld: { up: false, down: false, left: false, right: false },
   stepping: false,
 };
 
 const EMPTY_FRAME_DATA_URL =
   "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
 const CAMERA_DEADZONE = 0.08;
-const INVERT_CAMERA_X = true;
-const INVERT_CAMERA_Y = true;
-const MINEWORLD_INVERT_CAMERA_X = false;
-const MINEWORLD_INVERT_CAMERA_Y = false;
-const VID2WORLD_INVERT_CAMERA_X = false;
-const VID2WORLD_INVERT_CAMERA_Y = false;
 const MINEWORLD_CAMERA_DEADZONE = 0.015;
-const MINEWORLD_CAMERA_DELTA_GAIN = 0.3;
-const MINEWORLD_CAMERA_MAX_DELTA = 0.35;
 
 const el = {
   modelSelect: document.getElementById("modelSelect"),
@@ -46,8 +35,10 @@ const el = {
   startOverlay: document.getElementById("startOverlay"),
   frameView: document.getElementById("frameView"),
   gameStatus: document.getElementById("gameStatus"),
-  cameraStick: document.getElementById("cameraStick"),
-  cameraKnob: document.getElementById("cameraKnob"),
+  camUp: document.getElementById("camUp"),
+  camDown: document.getElementById("camDown"),
+  camLeft: document.getElementById("camLeft"),
+  camRight: document.getElementById("camRight"),
 };
 
 async function api(path, options = {}) {
@@ -143,7 +134,13 @@ function preferredDatasetForModel(modelId) {
 }
 
 function isChunkedModel(modelId) {
-  return modelId === "yume" || modelId === "infinite-world" || modelId === "gamecraft" || modelId === "worldplay" || modelId === "lingbot-world" || modelId === "matrixgame3";
+  return (
+    modelId === "yume" ||
+    modelId === "infinite-world" ||
+    modelId === "worldplay" ||
+    modelId === "lingbot-world-fast" ||
+    modelId === "matrixgame3"
+  );
 }
 
 function isLatencyModel(modelId) {
@@ -157,14 +154,11 @@ function chunkedModelLabel(modelId) {
   if (modelId === "yume") {
     return "YUME";
   }
-  if (modelId === "gamecraft") {
-    return "GameCraft";
-  }
   if (modelId === "worldplay") {
-    return "WorldPlay";
+    return "HY-WorldPlay 5B";
   }
-  if (modelId === "lingbot-world") {
-    return "LingBot-World";
+  if (modelId === "lingbot-world-fast") {
+    return "LingBot-World-Fast";
   }
   if (modelId === "matrixgame3") {
     return "Matrix-Game 3.0";
@@ -332,11 +326,6 @@ async function stepLoop() {
   } catch (err) {
     setGameStatus(`Step失败: ${err.message}`, true);
   } finally {
-    if (state.modelId === "mineworld") {
-      state.controls.camera_dx = 0;
-      state.controls.camera_dy = 0;
-      paintMineWorldCamera(0, 0);
-    }
     state.stepping = false;
   }
 }
@@ -345,49 +334,21 @@ function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
 
-function cameraInversionForModel() {
-  if (state.modelId === "diamond") {
-    return { invertX: true, invertY: true };
-  }
-  if (state.modelId === "matrixgame") {
-    return { invertX: false, invertY: false };
-  }
-  if (state.modelId === "matrixgame3") {
-    return { invertX: false, invertY: true };
-  }
-  if (state.modelId === "open-oasis") {
-    return { invertX: false, invertY: false };
-  }
-  if (state.modelId === "worldfm") {
-    return { invertX: false, invertY: false };
-  }
-  if (state.modelId === "mineworld") {
-    return { invertX: MINEWORLD_INVERT_CAMERA_X, invertY: MINEWORLD_INVERT_CAMERA_Y };
-  }
-  if (state.modelId === "infinite-world") {
-    return { invertX: false, invertY: false };
-  }
-  if (state.modelId === "vid2world") {
-    return { invertX: VID2WORLD_INVERT_CAMERA_X, invertY: VID2WORLD_INVERT_CAMERA_Y };
-  }
-  return { invertX: INVERT_CAMERA_X, invertY: INVERT_CAMERA_Y };
-}
-
-function paintMineWorldCamera(dx, dy) {
-  const size = 160;
-  const knobSize = 54;
-  const center = size / 2;
-  const maxRadius = (size - knobSize) / 2;
-  const kx = center - knobSize / 2 + dx * maxRadius;
-  const ky = center - knobSize / 2 + dy * maxRadius;
-  el.cameraKnob.style.left = `${kx}px`;
-  el.cameraKnob.style.top = `${ky}px`;
-}
-
 function updateWASDStyles() {
   document.querySelectorAll(".key").forEach((btn) => {
     const key = btn.dataset.key;
     btn.classList.toggle("active", !!state.controls[key]);
+  });
+}
+
+function updateCameraFromHeld() {
+  const dx = (state.cameraHeld.right ? 1 : 0) + (state.cameraHeld.left ? -1 : 0);
+  const dy = (state.cameraHeld.down ? 1 : 0) + (state.cameraHeld.up ? -1 : 0);
+  state.controls.camera_dx = clamp(dx, -1, 1);
+  state.controls.camera_dy = clamp(dy, -1, 1);
+  document.querySelectorAll(".cam-btn").forEach((btn) => {
+    const dir = btn.dataset.dir;
+    btn.classList.toggle("active", !!state.cameraHeld[dir]);
   });
 }
 
@@ -426,9 +387,11 @@ function bindKeyboard() {
     state.controls.r_click = false;
     state.controls.camera_dx = 0;
     state.controls.camera_dy = 0;
-    state.mineworldCameraActive = false;
-    state.mineworldCameraPointerId = null;
-    paintMineWorldCamera(0, 0);
+    state.cameraHeld.up = false;
+    state.cameraHeld.down = false;
+    state.cameraHeld.left = false;
+    state.cameraHeld.right = false;
+    updateCameraFromHeld();
     updateWASDStyles();
   });
 }
@@ -453,119 +416,30 @@ function bindWASDButtons() {
   });
 }
 
-function bindCameraStick() {
-  const stick = el.cameraStick;
-  const knob = el.cameraKnob;
-  const size = 160;
-  const knobSize = 54;
-  const center = size / 2;
-  const maxRadius = (size - knobSize) / 2;
-
-  let active = false;
-
-  const paint = (dx, dy) => {
-    const kx = center - knobSize / 2 + dx * maxRadius;
-    const ky = center - knobSize / 2 + dy * maxRadius;
-    knob.style.left = `${kx}px`;
-    knob.style.top = `${ky}px`;
-  };
-
-  const setFromPointer = (clientX, clientY) => {
-    const rect = stick.getBoundingClientRect();
-    const x = clientX - rect.left - center;
-    const y = clientY - rect.top - center;
-    const len = Math.hypot(x, y);
-    const scale = len > maxRadius ? maxRadius / len : 1;
-
-    const nx = (x * scale) / maxRadius;
-    const ny = (y * scale) / maxRadius;
-
-    const inv = cameraInversionForModel();
-    const mappedX = inv.invertX ? -nx : nx;
-    const mappedY = inv.invertY ? -ny : ny;
-    state.controls.camera_dx = Number(mappedX.toFixed(3));
-    state.controls.camera_dy = Number(mappedY.toFixed(3));
-    paint(nx, ny);
-  };
-
-  const resetStick = () => {
-    state.controls.camera_dx = 0;
-    state.controls.camera_dy = 0;
-    paint(0, 0);
-  };
-
-  const resetMineWorldStick = () => {
-    state.controls.camera_dx = 0;
-    state.controls.camera_dy = 0;
-    state.mineworldCameraActive = false;
-    state.mineworldCameraPointerId = null;
-    paintMineWorldCamera(0, 0);
-  };
-
-  const updateMineWorldFromDelta = (deltaX, deltaY) => {
-    const nx = clamp((deltaX / maxRadius) * MINEWORLD_CAMERA_DELTA_GAIN, -MINEWORLD_CAMERA_MAX_DELTA, MINEWORLD_CAMERA_MAX_DELTA);
-    const ny = clamp((deltaY / maxRadius) * MINEWORLD_CAMERA_DELTA_GAIN, -MINEWORLD_CAMERA_MAX_DELTA, MINEWORLD_CAMERA_MAX_DELTA);
-    const inv = cameraInversionForModel();
-    const mappedX = inv.invertX ? -nx : nx;
-    const mappedY = inv.invertY ? -ny : ny;
-    state.controls.camera_dx = Number(mappedX.toFixed(3));
-    state.controls.camera_dy = Number(mappedY.toFixed(3));
-    paintMineWorldCamera(nx, ny);
-  };
-
-  stick.addEventListener("pointerdown", (e) => {
-    if (state.modelId === "mineworld") {
-      state.mineworldCameraActive = true;
-      state.mineworldCameraPointerId = e.pointerId;
-      state.mineworldCameraLastX = e.clientX;
-      state.mineworldCameraLastY = e.clientY;
-      stick.setPointerCapture?.(e.pointerId);
-      return;
-    }
-    active = true;
-    setFromPointer(e.clientX, e.clientY);
-  });
-
-  window.addEventListener("pointermove", (e) => {
-    if (state.modelId === "mineworld") {
-      if (!state.mineworldCameraActive || state.mineworldCameraPointerId !== e.pointerId) {
-        return;
-      }
-      const deltaX = e.clientX - state.mineworldCameraLastX;
-      const deltaY = e.clientY - state.mineworldCameraLastY;
-      state.mineworldCameraLastX = e.clientX;
-      state.mineworldCameraLastY = e.clientY;
-      updateMineWorldFromDelta(deltaX, deltaY);
-      return;
-    }
-    if (!active) {
-      return;
-    }
-    setFromPointer(e.clientX, e.clientY);
-  });
-
-  const end = (e) => {
-    if (state.modelId === "mineworld") {
-      if (!state.mineworldCameraActive) {
-        return;
-      }
-      if (e && state.mineworldCameraPointerId !== null && e.pointerId !== state.mineworldCameraPointerId) {
-        return;
-      }
-      resetMineWorldStick();
-      return;
-    }
-    if (!active) {
-      return;
-    }
-    active = false;
-    resetStick();
-  };
-
-  window.addEventListener("pointerup", end);
-  window.addEventListener("pointercancel", end);
-
-  resetStick();
+function bindCameraButtons() {
+  const map = [
+    { el: el.camUp, dir: "up" },
+    { el: el.camDown, dir: "down" },
+    { el: el.camLeft, dir: "left" },
+    { el: el.camRight, dir: "right" },
+  ];
+  for (const { el: btn, dir } of map) {
+    if (!btn) continue;
+    btn.dataset.dir = dir;
+    const press = () => {
+      state.cameraHeld[dir] = true;
+      updateCameraFromHeld();
+    };
+    const release = () => {
+      state.cameraHeld[dir] = false;
+      updateCameraFromHeld();
+    };
+    btn.addEventListener("pointerdown", press);
+    btn.addEventListener("pointerup", release);
+    btn.addEventListener("pointercancel", release);
+    btn.addEventListener("pointerleave", release);
+  }
+  updateCameraFromHeld();
 }
 
 function bindEvents() {
@@ -597,7 +471,7 @@ function bindEvents() {
 
   bindKeyboard();
   bindWASDButtons();
-  bindCameraStick();
+  bindCameraButtons();
 }
 
 async function boot() {

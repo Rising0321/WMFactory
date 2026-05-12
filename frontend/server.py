@@ -11,7 +11,19 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from adapters import DiamondAdapter, GameCraftAdapter, InfiniteWorldAdapter, LingBotWorldAdapter, MatrixGameAdapter, MatrixGame3Adapter, MineWorldAdapter, OpenOasisAdapter, Vid2WorldAdapter, WhamAdapter, WonderWorldAdapter, WorldFMAdapter, WorldPlayAdapter, YumeAdapter
+from adapters import (
+    DiamondAdapter,
+    InfiniteWorldAdapter,
+    LingBotWorldFastAdapter,
+    MatrixGameAdapter,
+    MatrixGame3Adapter,
+    MineWorldAdapter,
+    OpenOasisAdapter,
+    Vid2WorldAdapter,
+    WhamAdapter,
+    WorldPlayAdapter,
+    YumeAdapter,
+)
 
 
 ROOT = Path(__file__).resolve().parent
@@ -50,20 +62,17 @@ class RandomDatasetImageRequest(BaseModel):
 class AppState:
     def __init__(self) -> None:
         self.adapters = {
-            "diamond": DiamondAdapter(),
-            "gamecraft": GameCraftAdapter(),
-            "infinite-world": InfiniteWorldAdapter(),
-            "lingbot-world": LingBotWorldAdapter(),
-            "vid2world": Vid2WorldAdapter(),
-            "wham": WhamAdapter(),
-            "mineworld": MineWorldAdapter(),
             "matrixgame": MatrixGameAdapter(),
             "matrixgame3": MatrixGame3Adapter(),
             "yume": YumeAdapter(),
-            "worldplay": WorldPlayAdapter(),
+            "diamond": DiamondAdapter(),
             "open-oasis": OpenOasisAdapter(),
-            "worldfm": WorldFMAdapter(),
-            "wonderworld": WonderWorldAdapter(),
+            "wham": WhamAdapter(),
+            "vid2world": Vid2WorldAdapter(),
+            "infinite-world": InfiniteWorldAdapter(),
+            "worldplay": WorldPlayAdapter(),
+            "mineworld": MineWorldAdapter(),
+            "lingbot-world-fast": LingBotWorldFastAdapter(),
         }
         self.active_model_id: Optional[str] = None
 
@@ -109,91 +118,85 @@ def _dataset_images(dataset_id: str) -> List[Path]:
 
 @app.get("/api/models")
 def list_models() -> Dict[str, Any]:
+    # Ids, labels, descriptions, and default worker ports aligned with WMBackend/vllm_wm/registry.py MODEL_SPECS.
     return {
         "models": [
-            {
-                "id": "diamond",
-                "label": "DIAMOND (CSGO)",
-                "status": "available",
-                "description": "Conditional diffusion world model with CSGO action space.",
-            },
-            {
-                "id": "gamecraft",
-                "label": "Hunyuan-GameCraft 1.0",
-                "status": "available",
-                "description": "Interactive chunked world model with GameCraft native WASD/camera action adaptation and original accelerated sampling settings.",
-            },
-            {
-                "id": "infinite-world",
-                "label": "Infinite-World",
-                "status": "available",
-                "description": "Interactive world model with image-conditioned long-horizon action rollout.",
-            },
-            {
-                "id": "lingbot-world",
-                "label": "LingBot-World (Cam NF4)",
-                "status": "available",
-                "description": "Quantized LingBot-World camera-control model with native 40-step chunk generation and WASD-to-camera-trajectory adaptation.",
-            },
-            {
-                "id": "vid2world",
-                "label": "Vid2World (CSGO)",
-                "status": "available",
-                "description": "Academic interactive world model for CSGO with native 50-step diffusion rollout.",
-            },
-            {
-                "id": "mineworld",
-                "label": "MineWorld",
-                "status": "available",
-                "description": "Real-time interactive Minecraft world model with WASD and camera control.",
-            },
-            {
-                "id": "wham",
-                "label": "WHAM (Bleeding Edge)",
-                "status": "available",
-                "description": "World and Human Action Model with gamepad-like 16D action control.",
-            },
-            {
-                "id": "yume",
-                "label": "YUME 1.5",
-                "status": "available",
-                "description": "Interactive first-person world model with discrete WASD and camera-motion chunk generation.",
-            },
-            {
-                "id": "worldplay",
-                "label": "HY-WorldPlay (WAN 5B)",
-                "status": "available",
-                "description": "Streaming first-person world model with native WorldPlay chunk memory and WASD/camera control.",
-            },
-            {
-                "id": "worldfm",
-                "label": "WorldFM",
-                "status": "available",
-                "description": "Interactive multi-view frame generation (start runs step1-3, step runs action-driven frame update).",
-            },
-            {
-                "id": "open-oasis",
-                "label": "Open-Oasis 500M",
-                "status": "available",
-                "description": "Action-conditional diffusion world model with WASD/camera control (DDIM=10 by default).",
-            },
             {
                 "id": "matrixgame",
                 "label": "Matrix-Game 2.0",
                 "status": "available",
-                "description": "Streaming interactive world model with WASD and camera control.",
+                "description": "Streaming interactive world model with latent history, native WASD and camera control.",
+                "default_port": 9003,
             },
             {
                 "id": "matrixgame3",
                 "label": "Matrix-Game 3.0",
                 "status": "available",
-                "description": "Chunked interactive world model with native Matrix-Game-3.0 action rollout and unified WASD/camera adaptation.",
+                "description": "Interactive process-driven world model with chunked video rollout and native prompt loop.",
+                "default_port": 9016,
             },
             {
-                "id": "wonderworld",
-                "label": "WonderWorld",
+                "id": "yume",
+                "label": "YUME 1.5",
                 "status": "available",
-                "description": "Interactive 3D scene generation from a single image with real-time viewpoint control.",
+                "description": "Chunked first-person image-to-video world model with discrete movement and camera prompts.",
+                "default_port": 9008,
+            },
+            {
+                "id": "diamond",
+                "label": "Diamond",
+                "status": "available",
+                "description": "Conditional diffusion world-model environment with CSGO action space and reward/end signals.",
+                "default_port": 9001,
+            },
+            {
+                "id": "open-oasis",
+                "label": "Open-Oasis 500M",
+                "status": "available",
+                "description": "Action-conditional diffusion world model with direct latent autoregression over frames.",
+                "default_port": 9005,
+            },
+            {
+                "id": "wham",
+                "label": "WHAM",
+                "status": "available",
+                "description": "Autoregressive token world model with 10-frame context and 16D gamepad-like action conditioning.",
+                "default_port": 9007,
+            },
+            {
+                "id": "vid2world",
+                "label": "Vid2World",
+                "status": "available",
+                "description": "Academic causal video diffusion world model for CSGO with history-conditioned action rollout.",
+                "default_port": 9010,
+            },
+            {
+                "id": "infinite-world",
+                "label": "Infinite-World",
+                "status": "available",
+                "description": "Long-horizon latent-history diffusion world model with move/view action streams.",
+                "default_port": 9011,
+            },
+            {
+                "id": "worldplay",
+                "label": "HY-WorldPlay 5B",
+                "status": "available",
+                "description": "WAN-based interactive first-person world model with rolling latent memory and camera-conditioned motion.",
+                "default_port": 9009,
+            },
+            {
+                "id": "mineworld",
+                "label": "MineWorld 1200M 32f",
+                "status": "available",
+                "description": "Minecraft autoregressive world model with diagonal decoding and explicit Transformer KV cache refresh.",
+                "default_port": 9012,
+            },
+            {
+                "id": "lingbot-world-fast",
+                "label": "LingBot-World-Fast",
+                "status": "available",
+                "description": "Causal autoregressive LingBot world model with per-call KV caching over camera-conditioned chunks.",
+                "default_port": 9013,
             },
         ]
     }

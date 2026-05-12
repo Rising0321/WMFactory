@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 import httpx
 
 from .base import StepResult, WorldModelAdapter
+from .runtime_utils import default_service_workdir
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -39,7 +40,7 @@ class MatrixGame3Adapter(WorldModelAdapter):
 
         self.service_host = os.getenv("WM_MATRIXGAME3_HOST", parsed.hostname or "127.0.0.1")
         self.service_port = int(os.getenv("WM_MATRIXGAME3_PORT", str(parsed.port or 9016)))
-        self.service_dir = Path(os.getenv("WM_MATRIXGAME3_SERVICE_DIR", str(ROOT / "services" / "matrixgame3")))
+        self.service_dir = Path(os.getenv("WM_MATRIXGAME3_SERVICE_DIR", str(default_service_workdir("matrixgame3"))))
         self.service_python = os.getenv(
             "WM_MATRIXGAME3_SERVICE_PYTHON",
             str(ROOT / "venvs" / "Matrix-Game-3" / "bin" / "python"),

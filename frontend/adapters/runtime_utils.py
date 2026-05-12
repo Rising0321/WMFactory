@@ -2,7 +2,25 @@ from __future__ import annotations
 
 import os
 import subprocess
+from pathlib import Path
 from typing import Callable, List, Optional
+
+
+def default_service_workdir(service_dir_name: str) -> Path:
+    """
+    Resolve the directory that contains the per-model FastAPI ``app.py``.
+
+    In this monorepo, service code lives under ``WMFactory/WMBackend/services/<name>/``.
+    Older layouts used ``WMFactory/services/<name>/``; we still honor that if it has ``app.py``.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    wb = repo_root / "WMBackend" / "services" / service_dir_name
+    legacy = repo_root / "services" / service_dir_name
+    if (wb / "app.py").is_file():
+        return wb
+    if (legacy / "app.py").is_file():
+        return legacy
+    return wb
 
 
 def _parse_nvidia_smi() -> List[dict]:

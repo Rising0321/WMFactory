@@ -1,10 +1,13 @@
 # WMFactory 0.5
 
-One environment. One command. Eleven interactive world models.
+<p align="center">
+<img width="300" src="assets/logo.png">
+</p>
+
+
+One environment. One Procedure. Eleven interactive world models.
 
 `WMFactory 0.5` is a major update of the WMFactory project. Its main goal is to remove the old per-model environment fragmentation and replace it with a single backend, a single shared runtime environment, and a single serving interface for many different world models.
-
-At the project level, `WMFactory` is the full repository. The current backend implementation lives in `vllm-wm/`.
 
 ## Project Goal
 
@@ -42,9 +45,21 @@ python -m pip install -r requirements.txt
 ### Start the backend
 
 ```bash
-cd vllm-wm
+cd WMBackend
 python serve.py
 ```
+
+
+### Full rollout regression:
+
+We strongy recommend new users to run the full rollout regression and understand the procedure of the backend.
+
+```bash
+cd WMBackend
+PYTHONNOUSERSITE=1 python scripts/verify_action_sweep_outputs.py
+```
+
+Each successful model rollout writes results into `WMBackend/testOutput/<model>/`.
 
 ### Load one model
 
@@ -80,34 +95,53 @@ Common action examples:
 
 The transport format is unified. Exact action semantics remain model-specific.
 
-## Testing
-
-Full rollout regression:
-
-```bash
-cd vllm-wm
-PYTHONNOUSERSITE=1 python scripts/verify_demo_outputs.py
-```
-
-Each successful model rollout writes results into `vllm-wm/testOutput/<model>/`.
-
 ## Supported Models
 
 The current backend covers eleven models.
 
-| Model | Upstream Repository | Download Command |
-| --- | --- | --- |
-| `matrixgame` (Matrix-Game 2.0) | `https://github.com/SkyworkAI/Matrix-Game` | `huggingface-cli download Skywork/Matrix-Game-2.0 --local-dir vllm-wm/checkpoints/matrixgame2` |
-| `matrixgame3` (Matrix-Game 3.0) | `https://github.com/SkyworkAI/Matrix-Game-3.0` | `huggingface-cli download Skywork/Matrix-Game-3.0 --local-dir vllm-wm/checkpoints/matrixgame3` |
-| `yume` (YUME 1.5) | `https://github.com/stdstu12/YUME` | `huggingface-cli download stdstu123/Yume-5B-720P --local-dir vllm-wm/checkpoints/yume/Yume-5B-720P`<br>`huggingface-cli download OpenGVLab/InternVL3-2B-Instruct --local-dir vllm-wm/checkpoints/yume/InternVL3-2B-Instruct` |
-| `diamond` | `https://github.com/eloialonso/diamond` | `huggingface-cli download eloialonso/diamond --include "csgo/*" --local-dir vllm-wm/checkpoints/diamond` |
-| `open-oasis` | `https://github.com/etched-ai/open-oasis` | `huggingface-cli download Etched/oasis-500m oasis500m.safetensors --local-dir vllm-wm/checkpoints/openoasis`<br>`huggingface-cli download Etched/oasis-500m vit-l-20.safetensors --local-dir vllm-wm/checkpoints/openoasis` |
-| `wham` | `TODO` | `huggingface-cli download microsoft/WHAM models/WHAM_200M.ckpt --local-dir vllm-wm/checkpoints/wham` |
-| `vid2world` | `https://github.com/thuml/Vid2World` | `huggingface-cli download thuml/Vid2World-CSGO --local-dir vllm-wm/checkpoints/vid2world/Vid2World-CSGO` |
-| `infinite-world` | `TODO` | `huggingface-cli download MeiGen-AI/Infinite-World --local-dir vllm-wm/checkpoints/infiniteworld` |
-| `worldplay` (HY-WorldPlay 5B) | `https://github.com/Tencent-Hunyuan/HY-WorldPlay` | `huggingface-cli download tencent/HY-WorldPlay --include "wan_transformer/*" --local-dir vllm-wm/checkpoints/worldplay/HY-WorldPlay`<br>`huggingface-cli download tencent/HY-WorldPlay --include "wan_distilled_model/model.pt" --local-dir vllm-wm/checkpoints/worldplay/HY-WorldPlay`<br>`huggingface-cli download tencent/HunyuanVideo-1.5 --local-dir vllm-wm/checkpoints/worldplay/Wan2.2-TI2V-5B-Diffusers` |
-| `mineworld` | `https://github.com/microsoft/mineworld` | `TODO: fill with the public Hugging Face checkpoint command once the release path is stable` |
-| `lingbot-world-fast` | `https://github.com/robbyant/lingbot-world` | `huggingface-cli download robbyant/lingbot-world-base-cam --local-dir vllm-wm/checkpoints/lingbotworld/lingbot-world-base-cam`<br>`huggingface-cli download robbyant/lingbot-world-fast --local-dir vllm-wm/checkpoints/lingbotworld/lingbot-world-base-cam/lingbot_world_fast` |
+| Model | Upstream Repository | 
+| --- | --- | 
+| `matrixgame` (Matrix-Game 2.0) | `https://github.com/SkyworkAI/Matrix-Game` | 
+| `matrixgame3` (Matrix-Game 3.0) | `https://github.com/SkyworkAI/Matrix-Game-3.0` | 
+| `yume` (YUME 1.5) | `https://github.com/stdstu12/YUME` | 
+| `diamond` | `https://github.com/eloialonso/diamond` |
+| `open-oasis` | `https://github.com/etched-ai/open-oasis` |
+| `wham` | `https://huggingface.co/microsoft/wham` |
+| `vid2world` | `https://github.com/thuml/Vid2World` |
+| `infinite-world` | `https://github.com/MeiGen-AI/Infinite-World` |
+| `worldplay` (HY-WorldPlay 5B) | `https://github.com/Tencent-Hunyuan/HY-WorldPlay` |
+| `mineworld` | `https://github.com/microsoft/mineworld` |
+| `lingbot-world-fast` | `https://github.com/robbyant/lingbot-world` |
+
+
+## Model Checkpoints
+
+The model checkpoints must be stored in `WMBackend/checkpoints/<model>/`.
+
+See `WMBackend/checkpointTree.md` for the on-disk layout and a folder tree.
+
+
+## Unified Frontend
+
+<p align="center">
+<img width="300" src="assets/frontend.png">
+</p>
+
+For convenience, we provide a unified frontend that you can use WASD and ↑↓←→ to use 11 different interactive world models. You can start the frontend as follow:
+
+```bash
+cd WMFactory/frontend
+python -m uvicorn server:app --host 0.0.0.0 --port 8080
+```
+
+Open `http://127.0.0.1:8080` in a browser.
+
+Remember to start the backend before starting the frontend.
+
+```bash
+cd WMBackend
+python serve.py
+```
 
 ## Acknowledgments
 

@@ -3,12 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>WMFactory Unified Frontend</title>
+    <title>WMFactory</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <div class="app-shell">
       <header class="topbar">
+        <section class="brand">
+          <div class="brand-mark">WM</div>
+          <div class="brand-text">
+            <div class="brand-title">WMFactory</div>
+            <div class="brand-subtitle">Unified Frontend for Unified Backend</div>
+          </div>
+        </section>
         <section class="panel model-panel">
           <h2>模型选择</h2>
           <div class="row">
@@ -51,9 +58,11 @@
               <button class="key key-d" data-key="d">D</button>
             </div>
 
-            <div class="camera-stick" id="cameraStick">
-              <div class="camera-ring"></div>
-              <div class="camera-knob" id="cameraKnob"></div>
+            <div class="camera-pad" aria-label="camera controls">
+              <button class="cam-btn cam-up" id="camUp" aria-label="camera up">↑</button>
+              <button class="cam-btn cam-left" id="camLeft" aria-label="camera left">←</button>
+              <button class="cam-btn cam-down" id="camDown" aria-label="camera down">↓</button>
+              <button class="cam-btn cam-right" id="camRight" aria-label="camera right">→</button>
             </div>
           </div>
         </div>

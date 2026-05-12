@@ -1,11 +1,12 @@
 :root {
-  --bg: #0f1617;
-  --bg-soft: #172426;
-  --panel: rgba(23, 36, 38, 0.88);
-  --line: rgba(174, 225, 199, 0.25);
-  --text: #eaf8ef;
-  --muted: #9fc0ad;
-  --accent: #8af2b6;
+  --bg: #0b1220;
+  --bg-soft: rgba(255, 255, 255, 0.06);
+  --panel: rgba(255, 255, 255, 0.08);
+  --line: rgba(255, 255, 255, 0.16);
+  --text: rgba(255, 255, 255, 0.92);
+  --muted: rgba(255, 255, 255, 0.66);
+  --accent: #7c5cff;
+  --accent-2: #2fe6b9;
   --danger: #ff8a8a;
 }
 
@@ -18,7 +19,11 @@ body {
   min-height: 100vh;
   font-family: "IBM Plex Sans", "Noto Sans SC", "Segoe UI", sans-serif;
   color: var(--text);
-  background: radial-gradient(circle at 12% 15%, #21393b 0%, #0f1617 42%, #0a0f10 100%);
+  background:
+    radial-gradient(900px 560px at 10% 12%, rgba(124, 92, 255, 0.28) 0%, rgba(124, 92, 255, 0.02) 55%, transparent 70%),
+    radial-gradient(820px 520px at 85% 20%, rgba(47, 230, 185, 0.2) 0%, rgba(47, 230, 185, 0.02) 58%, transparent 72%),
+    radial-gradient(1200px 700px at 45% 95%, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0.0) 55%),
+    #080d18;
 }
 
 .app-shell {
@@ -31,8 +36,9 @@ body {
 
 .topbar {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1.2fr 1fr 1fr;
   gap: 14px;
+  align-items: stretch;
 }
 
 .panel {
@@ -42,6 +48,38 @@ body {
   border-radius: 14px;
   padding: 12px 14px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+.brand {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: linear-gradient(135deg, rgba(124, 92, 255, 0.18), rgba(47, 230, 185, 0.12));
+}
+
+.brand-mark {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.brand-title {
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.brand-subtitle {
+  font-size: 0.9rem;
+  color: var(--muted);
 }
 
 h2 {
@@ -63,7 +101,7 @@ button {
   height: 38px;
   border-radius: 10px;
   border: 1px solid var(--line);
-  background: rgba(10, 17, 19, 0.7);
+  background: rgba(0, 0, 0, 0.22);
   color: var(--text);
   padding: 0 10px;
 }
@@ -73,7 +111,7 @@ button {
 }
 
 button:hover {
-  border-color: var(--accent);
+  border-color: rgba(255, 255, 255, 0.28);
 }
 
 .status {
@@ -107,8 +145,8 @@ button:hover {
   border: 1px solid var(--line);
   background: repeating-linear-gradient(
     45deg,
-    rgba(137, 201, 173, 0.05),
-    rgba(137, 201, 173, 0.05) 12px,
+    rgba(255, 255, 255, 0.05),
+    rgba(255, 255, 255, 0.05) 12px,
     rgba(0, 0, 0, 0) 12px,
     rgba(0, 0, 0, 0) 24px
   );
@@ -144,8 +182,8 @@ button:hover {
   font-size: 1rem;
   font-weight: 700;
   border-radius: 999px;
-  border: 1px solid var(--accent);
-  background: rgba(12, 24, 25, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: linear-gradient(135deg, rgba(124, 92, 255, 0.35), rgba(47, 230, 185, 0.22));
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
   pointer-events: auto;
 }
@@ -171,14 +209,14 @@ button:hover {
   height: 52px;
   border-radius: 13px;
   border: 1px solid rgba(234, 248, 239, 0.25);
-  background: rgba(12, 24, 25, 0.35);
+  background: rgba(0, 0, 0, 0.22);
   color: var(--text);
   font-weight: 700;
 }
 
 .key.active {
-  background: rgba(138, 242, 182, 0.28);
-  border-color: var(--accent);
+  background: rgba(124, 92, 255, 0.26);
+  border-color: rgba(124, 92, 255, 0.72);
 }
 
 .key-w {
@@ -201,34 +239,65 @@ button:hover {
   top: 59px;
 }
 
-.camera-stick {
+.camera-pad {
   position: absolute;
   right: 22px;
   bottom: 22px;
-  width: 160px;
-  height: 160px;
+  width: 172px;
+  height: 172px;
   pointer-events: auto;
   touch-action: none;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 8px;
+  padding: 10px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(8px);
 }
 
-.camera-ring {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  border: 1px solid rgba(234, 248, 239, 0.35);
-  background: rgba(12, 24, 25, 0.25);
+.cam-btn {
+  width: 100%;
+  height: 100%;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(0, 0, 0, 0.16);
+  color: var(--text);
+  font-size: 1.1rem;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
 }
 
-.camera-knob {
-  position: absolute;
-  width: 54px;
-  height: 54px;
-  left: 53px;
-  top: 53px;
-  border-radius: 50%;
-  background: rgba(138, 242, 182, 0.32);
-  border: 1px solid var(--accent);
-  box-shadow: 0 0 26px rgba(138, 242, 182, 0.4);
+.cam-btn:hover {
+  border-color: rgba(255, 255, 255, 0.26);
+}
+
+.cam-btn.active {
+  background: rgba(47, 230, 185, 0.2);
+  border-color: rgba(47, 230, 185, 0.72);
+}
+
+.cam-up {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.cam-left {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.cam-down {
+  grid-column: 2;
+  grid-row: 3;
+}
+
+.cam-right {
+  grid-column: 3;
+  grid-row: 2;
 }
 
 @media (max-width: 980px) {

@@ -1,4 +1,4 @@
-# Canonical runtime environment for vllm-wm.
+# Canonical runtime environment for WMBackend.
 # This is the single source of truth for the shared backend environment.
 # `flash-attn` is required and must be installed successfully by the user.
 

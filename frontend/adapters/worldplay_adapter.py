@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 import httpx
 
 from .base import StepResult, WorldModelAdapter
+from .runtime_utils import default_service_workdir
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -39,7 +40,7 @@ class WorldPlayAdapter(WorldModelAdapter):
 
         self.service_host = os.getenv("WM_WORLDPLAY_HOST", parsed.hostname or "127.0.0.1")
         self.service_port = int(os.getenv("WM_WORLDPLAY_PORT", str(parsed.port or 9009)))
-        self.service_dir = Path(os.getenv("WM_WORLDPLAY_SERVICE_DIR", str(ROOT / "services" / "worldplay")))
+        self.service_dir = Path(os.getenv("WM_WORLDPLAY_SERVICE_DIR", str(default_service_workdir("worldplay"))))
         self.service_python = os.getenv("WM_WORLDPLAY_PYTHON", str(ROOT / "venvs" / "HY-WorldPlay" / "bin" / "python"))
         self.service_log = Path(os.getenv("WM_WORLDPLAY_LOG", str(self.service_dir / "worldplay_service.log")))
         self.step_log_every = int(os.getenv("WM_WORLDPLAY_STEP_LOG_EVERY", "1"))

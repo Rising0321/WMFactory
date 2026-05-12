@@ -13,7 +13,7 @@ from urllib.parse import urlparse
 import httpx
 
 from .base import StepResult, WorldModelAdapter
-from .runtime_utils import configure_subprocess_cuda
+from .runtime_utils import configure_subprocess_cuda, default_service_workdir
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -40,8 +40,8 @@ class WhamAdapter(WorldModelAdapter):
         self.startup_timeout = float(os.getenv("WM_WHAM_STARTUP_TIMEOUT", "180"))
 
         self.service_host = os.getenv("WM_WHAM_HOST", parsed.hostname or "127.0.0.1")
-        self.service_port = int(os.getenv("WM_WHAM_PORT", str(parsed.port or 9005)))
-        self.service_dir = Path(os.getenv("WM_WHAM_SERVICE_DIR", str(ROOT / "services" / "wham")))
+        self.service_port = int(os.getenv("WM_WHAM_PORT", str(parsed.port or 9007)))
+        self.service_dir = Path(os.getenv("WM_WHAM_SERVICE_DIR", str(default_service_workdir("wham"))))
         self.service_python = os.getenv("WM_WHAM_PYTHON", str(ROOT / "venvs" / "wham" / "bin" / "python"))
         self.service_log = Path(os.getenv("WM_WHAM_LOG", str(self.service_dir / "wham_service.log")))
         self.step_log_every = int(os.getenv("WM_WHAM_STEP_LOG_EVERY", "20"))

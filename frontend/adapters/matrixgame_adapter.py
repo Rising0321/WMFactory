@@ -13,7 +13,7 @@ from urllib.parse import urlparse
 import httpx
 
 from .base import StepResult, WorldModelAdapter
-from .runtime_utils import configure_subprocess_cuda
+from .runtime_utils import configure_subprocess_cuda, default_service_workdir
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -41,7 +41,7 @@ class MatrixGameAdapter(WorldModelAdapter):
 
         self.service_host = os.getenv("WM_MATRIXGAME_HOST", parsed.hostname or "127.0.0.1")
         self.service_port = int(os.getenv("WM_MATRIXGAME_PORT", str(parsed.port or 9003)))
-        self.service_dir = Path(os.getenv("WM_MATRIXGAME_SERVICE_DIR", str(ROOT / "services" / "matrixgame")))
+        self.service_dir = Path(os.getenv("WM_MATRIXGAME_SERVICE_DIR", str(default_service_workdir("matrixgame"))))
         self.service_python = os.getenv("WM_MATRIXGAME_PYTHON", str(ROOT / "venvs" / "Matrix-Game" / "bin" / "python"))
         self.service_log = Path(os.getenv("WM_MATRIXGAME_LOG", str(self.service_dir / "matrixgame_service.log")))
         self.step_log_every = int(os.getenv("WM_MATRIXGAME_STEP_LOG_EVERY", "20"))

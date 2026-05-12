@@ -114,3 +114,4 @@ _models_legacy/**/.gradio/
 node_modules/
 .next/
 coverage/
+/services/

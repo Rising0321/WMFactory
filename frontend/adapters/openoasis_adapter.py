@@ -13,7 +13,7 @@ from urllib.parse import urlparse
 import httpx
 
 from .base import StepResult, WorldModelAdapter
-from .runtime_utils import configure_subprocess_cuda
+from .runtime_utils import configure_subprocess_cuda, default_service_workdir
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -41,7 +41,7 @@ class OpenOasisAdapter(WorldModelAdapter):
 
         self.service_host = os.getenv("WM_OPENOASIS_HOST", parsed.hostname or "127.0.0.1")
         self.service_port = int(os.getenv("WM_OPENOASIS_PORT", str(parsed.port or 9005)))
-        self.service_dir = Path(os.getenv("WM_OPENOASIS_SERVICE_DIR", str(ROOT / "services" / "openoasis")))
+        self.service_dir = Path(os.getenv("WM_OPENOASIS_SERVICE_DIR", str(default_service_workdir("openoasis"))))
         self.service_python = os.getenv("WM_OPENOASIS_PYTHON", str(ROOT / "venvs" / "open-oasis" / "bin" / "python"))
         self.service_log = Path(os.getenv("WM_OPENOASIS_LOG", str(self.service_dir / "openoasis_service.log")))
         self.step_log_every = int(os.getenv("WM_OPENOASIS_STEP_LOG_EVERY", "20"))
